@@ -16,7 +16,8 @@ import {
   TrendingUp,
   User,
   Settings,
-  Users
+  Users,
+  Wallet
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 
@@ -36,6 +37,7 @@ export default function DashboardLayout({
       { name: "Kasir (POS)", href: "/pos", icon: ShoppingCart, roles: ["owner", "manager", "kasir"] },
       { name: "Inventaris & Stok", href: "/inventory", icon: Package, roles: ["owner", "manager"] },
       { name: "Produk & Resep", href: "/products", icon: Receipt, roles: ["owner", "manager"] },
+      { name: "Pengeluaran", href: "/expenses", icon: Wallet, roles: ["owner", "manager"] },
       { name: "Laporan Keuangan", href: "/reports", icon: PieChart, roles: ["owner"] },
       { name: "Manajemen Karyawan", href: "/employees", icon: Users, roles: ["owner"] },
       { name: "AI Assistant", href: "/ai", icon: Sparkles, roles: ["owner"] },
