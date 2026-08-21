@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Search, Plus, Minus, Trash2, CreditCard, Banknote, ShoppingCart } from "lucide-react";
+import { Search, Plus, Minus, Trash2, CreditCard, Banknote, ShoppingCart, X } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 
 const dummyProducts = [
@@ -19,6 +19,7 @@ export default function PosInterface() {
   const [cart, setCart] = useState<any[]>([]);
   const [search, setSearch] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("Semua");
+  const [isMobileCartOpen, setIsMobileCartOpen] = useState(false);
 
   const categories = ["Semua", ...Array.from(new Set(dummyProducts.map(p => p.category)))];
 
@@ -122,18 +123,47 @@ export default function PosInterface() {
             </AnimatePresence>
           </div>
         </div>
+        
+        {/* Mobile Cart Floating Bar */}
+        {!isMobileCartOpen && (
+          <div className="md:hidden fixed bottom-4 left-4 right-4 z-40">
+            <button 
+              onClick={() => setIsMobileCartOpen(true)}
+              className="w-full bg-indigo-600 text-white rounded-2xl p-4 shadow-xl flex items-center justify-between font-bold"
+            >
+              <div className="flex items-center gap-3">
+                <div className="relative">
+                  <ShoppingCart className="w-6 h-6" />
+                  <span className="absolute -top-2 -right-2 bg-red-500 text-white text-xs w-5 h-5 flex items-center justify-center rounded-full">
+                    {cart.reduce((sum, item) => sum + item.qty, 0)}
+                  </span>
+                </div>
+                <span>Lihat Pesanan</span>
+              </div>
+              <span>Rp {total.toLocaleString('id-ID')}</span>
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Cart Section (Right) */}
-      <div className="w-full md:w-96 lg:w-[420px] bg-white border-l border-slate-200 flex flex-col shadow-2xl z-10 md:relative fixed inset-0 md:inset-auto translate-y-full md:translate-y-0 transition-transform">
+      <div className={`w-full md:w-96 lg:w-[420px] bg-white border-l border-slate-200 flex flex-col shadow-2xl z-50 md:relative fixed inset-0 md:inset-auto transition-transform duration-300 ${isMobileCartOpen ? "translate-y-0" : "translate-y-full md:translate-y-0"}`}>
         <div className="p-4 border-b border-slate-100 flex justify-between items-center bg-white">
           <h2 className="text-lg font-bold text-slate-800 flex items-center gap-2">
             <ShoppingCart className="w-5 h-5 text-indigo-600" />
             Pesanan Saat Ini
           </h2>
-          <span className="bg-indigo-100 text-indigo-800 text-xs font-bold px-2 py-1 rounded-full">
-            {cart.reduce((sum, item) => sum + item.qty, 0)} Item
-          </span>
+          <div className="flex items-center gap-3">
+            <span className="bg-indigo-100 text-indigo-800 text-xs font-bold px-2 py-1 rounded-full hidden md:inline-block">
+              {cart.reduce((sum, item) => sum + item.qty, 0)} Item
+            </span>
+            <button 
+              className="md:hidden p-2 text-slate-500 hover:text-slate-800 hover:bg-slate-100 rounded-full"
+              onClick={() => setIsMobileCartOpen(false)}
+            >
+              <X className="w-5 h-5" />
+            </button>
+          </div>
         </div>
 
         <div className="flex-1 overflow-y-auto p-4 bg-slate-50/50">
