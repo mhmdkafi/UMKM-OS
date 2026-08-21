@@ -25,14 +25,14 @@ export default function AiAssistantPage() {
     e.preventDefault();
     if (!input.trim()) return;
 
-    const userMsg = { id: Date.now(), sender: "user", text: input, type: "text" };
+    const userMsg: Message = { id: Date.now(), sender: "user", text: input, type: "text" };
     setMessages(prev => [...prev, userMsg]);
     setInput("");
     setIsTyping(true);
 
     // Simulate AI response
     setTimeout(() => {
-      let aiResponse: any;
+      let aiResponse: Message;
       
       if (userMsg.text.toLowerCase().includes("profit") || userMsg.text.toLowerCase().includes("laba")) {
         aiResponse = { 
