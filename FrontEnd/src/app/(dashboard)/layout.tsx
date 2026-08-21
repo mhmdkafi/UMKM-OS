@@ -15,7 +15,8 @@ import {
   X,
   TrendingUp,
   User,
-  Settings
+  Settings,
+  Users
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 
@@ -36,6 +37,7 @@ export default function DashboardLayout({
       { name: "Inventaris & Stok", href: "/inventory", icon: Package, roles: ["owner", "manager"] },
       { name: "Produk & Resep", href: "/products", icon: Receipt, roles: ["owner", "manager"] },
       { name: "Laporan Keuangan", href: "/reports", icon: PieChart, roles: ["owner"] },
+      { name: "Manajemen Karyawan", href: "/employees", icon: Users, roles: ["owner"] },
       { name: "AI Assistant", href: "/ai", icon: Sparkles, roles: ["owner"] },
     ];
     return allItems.filter(item => item.roles.includes(activeRole));
