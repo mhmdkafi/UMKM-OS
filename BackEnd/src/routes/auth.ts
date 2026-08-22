@@ -18,18 +18,20 @@ router.post('/login', async (req, res) => {
           { name: identifier }
         ]
       },
+      include: { business: true } // Fetch business to get category (saved in address)
     });
 
     if (user && user.pin === password_or_pin) {
+      const category = user.business?.address || "Lainnya";
       const token = jwt.sign(
-        { id: user.id, role: user.role, name: user.name, business_id: user.business_id },
+        { id: user.id, role: user.role, name: user.name, business_id: user.business_id, business_category: category },
         JWT_SECRET,
         { expiresIn: '7d' }
       );
       return res.json({
         success: true,
         token,
-        user: { id: user.id, name: user.name, role: user.role, business_id: user.business_id },
+        user: { id: user.id, name: user.name, role: user.role, business_id: user.business_id, business_category: category },
       });
     }
 
@@ -75,8 +77,9 @@ router.post('/register', async (req, res) => {
     });
 
     // Generate JWT token so user is auto-logged-in after registration
+    const category = business_category || "Lainnya";
     const token = jwt.sign(
-      { id: user.id, role: user.role, name: user.name, business_id: user.business_id },
+      { id: user.id, role: user.role, name: user.name, business_id: user.business_id, business_category: category },
       JWT_SECRET,
       { expiresIn: '7d' }
     );
@@ -84,7 +87,7 @@ router.post('/register', async (req, res) => {
     res.json({
       success: true,
       token,
-      user: { id: user.id, name: user.name, role: user.role, business_id: user.business_id },
+      user: { id: user.id, name: user.name, role: user.role, business_id: user.business_id, business_category: category },
     });
   } catch (err) {
     console.error(err);

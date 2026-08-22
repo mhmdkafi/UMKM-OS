@@ -35,6 +35,7 @@ export default function DashboardLayout({
   const [activeRole, setActiveRole] = useState<"owner" | "manager" | "kasir">("owner");
   const [userName, setUserName] = useState("");
   const [isProfileDropdownOpen, setIsProfileDropdownOpen] = useState(false);
+  const [businessCategory, setBusinessCategory] = useState("Lainnya");
   const [isAiPopupOpen, setIsAiPopupOpen] = useState(false);
   const [aiMessage, setAiMessage] = useState("");
 
@@ -48,6 +49,7 @@ export default function DashboardLayout({
     try {
       const user = JSON.parse(userStr);
       setUserName(user.name || 'User');
+      setBusinessCategory(user.business_category || 'Lainnya');
       const role = (user.role || 'OWNER').toLowerCase();
       if (role === 'owner') setActiveRole('owner');
       else if (role === 'manager' || role === 'admin') setActiveRole('manager');
@@ -57,11 +59,28 @@ export default function DashboardLayout({
 
   // Determine which navigation items to show based on the selected role (for demo purposes)
   const getNavItems = () => {
+    let inventoryName = "Inventaris & Stok";
+    let productsName = "Daftar Produk";
+
+    if (businessCategory === "Food & Beverage (Kuliner)") {
+       inventoryName = "Inventaris Bahan Baku";
+       productsName = "Menu & Resep";
+    } else if (businessCategory === "Retail / Toko Kelontong") {
+       inventoryName = "Stok Gudang / Inventaris";
+       productsName = "Etalase Produk";
+    } else if (businessCategory === "Fashion & Pakaian") {
+       inventoryName = "Stok Barang / Kain";
+       productsName = "Katalog Pakaian";
+    } else if (businessCategory === "Jasa / Salon / Bengkel") {
+       inventoryName = "Perlengkapan & Suku Cadang";
+       productsName = "Daftar Layanan/Jasa";
+    }
+
     const allItems = [
       { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard, roles: ["owner"] },
       { name: "Kasir (POS)", href: "/pos", icon: ShoppingCart, roles: ["owner", "manager", "kasir"] },
-      { name: "Inventaris & Stok", href: "/inventory", icon: Package, roles: ["owner", "manager"] },
-      { name: "Produk & Resep", href: "/products", icon: Receipt, roles: ["owner", "manager"] },
+      { name: inventoryName, href: "/inventory", icon: Package, roles: ["owner", "manager"] },
+      { name: productsName, href: "/products", icon: Receipt, roles: ["owner", "manager"] },
       { name: "Pengeluaran", href: "/expenses", icon: Wallet, roles: ["owner", "manager"] },
       { name: "Laporan Keuangan", href: "/reports", icon: PieChart, roles: ["owner"] },
       { name: "Manajemen Karyawan", href: "/employees", icon: Users, roles: ["owner"] },
