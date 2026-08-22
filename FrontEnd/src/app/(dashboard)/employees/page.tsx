@@ -23,8 +23,18 @@ export default function EmployeesPage() {
   const [editRole, setEditRole] = useState("Kasir");
   const [editAccessValue, setEditAccessValue] = useState("");
 
+  const getBusinessId = () => {
+    if (typeof window !== 'undefined') {
+      const user = JSON.parse(localStorage.getItem('user') || '{}');
+      return user.business_id;
+    }
+    return '';
+  };
+
   const fetchEmployees = () => {
-    fetch(`${API}/employees`)
+    const bid = getBusinessId();
+    if (!bid) return;
+    fetch(`${API}/employees?business_id=${bid}`)
       .then(res => res.json())
       .then(data => setEmployees(data))
       .catch(console.error);
@@ -42,7 +52,8 @@ export default function EmployeesPage() {
     if (!newName || !newAccessValue) return;
 
     try {
-      const body: any = { name: newName, role: newRole };
+      const bid = getBusinessId();
+      const body: any = { business_id: bid, name: newName, role: newRole };
       if (newRole === 'Kasir') body.pin = newAccessValue;
       else body.email = newAccessValue;
 

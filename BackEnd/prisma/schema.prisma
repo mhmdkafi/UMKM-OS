@@ -62,6 +62,8 @@ model Product {
   name          String
   price         Float
   image_url     String?
+  stock         Float           @default(0)
+  is_service    Boolean         @default(false)
   recipes       ProductRecipe[]
   transaction_items TransactionItem[]
 }

@@ -6,7 +6,13 @@ const router = Router();
 // ==================== GET ALL EMPLOYEES ====================
 router.get('/', async (req: Request, res: Response) => {
   try {
-    const users = await prisma.user.findMany({ orderBy: { created_at: 'desc' } });
+    const { business_id } = req.query;
+    const whereClause = business_id ? { business_id: String(business_id) } : {};
+
+    const users = await prisma.user.findMany({ 
+      where: whereClause,
+      orderBy: { created_at: 'desc' } 
+    });
     const formatted = users.map(u => ({
       id: u.id,
       business_id: u.business_id,
@@ -27,14 +33,12 @@ router.get('/', async (req: Request, res: Response) => {
 router.post('/', async (req: Request, res: Response) => {
   const { business_id, name, role, email, pin } = req.body;
   try {
-    let bId = business_id;
-    if (!bId) {
-      const biz = await prisma.business.findFirst();
-      bId = biz?.id;
+    if (!business_id) {
+      return res.status(400).json({ error: 'business_id is required' });
     }
     const user = await prisma.user.create({
       data: {
-        business_id: bId,
+        business_id,
         name,
         role: role.toLowerCase(),
         email: email || null,

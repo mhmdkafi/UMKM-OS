@@ -97,11 +97,19 @@ router.delete('/:id', async (req: Request, res: Response) => {
 router.post('/adjust', async (req: Request, res: Response) => {
   const { id, type, amount, notes } = req.body;
   try {
+    const current = await prisma.ingredient.findUnique({ where: { id } });
+    if (!current) return res.status(404).json({ error: 'Ingredient not found' });
+    
+    let newStock = current.stock;
+    if (type === 'in') {
+      newStock += parseFloat(amount);
+    } else {
+      newStock = Math.max(0, newStock - parseFloat(amount));
+    }
+
     const ingredient = await prisma.ingredient.update({
       where: { id },
-      data: {
-        stock: type === 'in' ? { increment: parseFloat(amount) } : { decrement: parseFloat(amount) },
-      },
+      data: { stock: newStock },
     });
 
     await prisma.inventoryMovement.create({

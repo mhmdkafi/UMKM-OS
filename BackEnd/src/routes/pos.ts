@@ -40,35 +40,68 @@ router.post('/checkout', async (req: Request, res: Response) => {
         },
       });
 
-      // Deduct ingredient stock based on BOM
+      const alerts: string[] = [];
+
+      // Deduct ingredient stock based on BOM or direct stock
       for (const item of items) {
         const recipes = await tx.productRecipe.findMany({
           where: { product_id: item.id },
         });
 
-        for (const recipe of recipes) {
-          const totalUsed = recipe.quantity_used * item.qty;
+        if (recipes.length > 0) {
+          // F&B Mode: Deduct Ingredients
+          for (const recipe of recipes) {
+            const totalUsed = recipe.quantity_used * item.qty;
 
-          await tx.ingredient.update({
-            where: { id: recipe.ingredient_id },
-            data: { stock: { decrement: totalUsed } },
-          });
+            const ing = await tx.ingredient.findUnique({ where: { id: recipe.ingredient_id } });
+            if (ing) {
+              const newStock = Math.max(0, ing.stock - totalUsed);
+              await tx.ingredient.update({
+                where: { id: recipe.ingredient_id },
+                data: { stock: newStock },
+              });
 
-          await tx.inventoryMovement.create({
-            data: {
-              ingredient_id: recipe.ingredient_id,
-              type: 'OUT',
-              quantity: totalUsed,
-              notes: `POS Transaksi: ${newTx.id}`,
-            },
-          });
+              if (newStock <= ing.min_stock_alert) {
+                 if (!alerts.includes(`Stok bahan ${ing.name} menipis/habis (sisa ${newStock} ${ing.unit})`)) {
+                    alerts.push(`Stok bahan ${ing.name} menipis/habis (sisa ${newStock} ${ing.unit})`);
+                 }
+              }
+
+              await tx.inventoryMovement.create({
+                data: {
+                  ingredient_id: recipe.ingredient_id,
+                  type: 'OUT',
+                  quantity: ing.stock - newStock,
+                  notes: `POS Transaksi: ${newTx.id}`,
+                },
+              });
+            }
+          }
+        } else {
+          // Retail/Service Mode: Deduct Direct Stock if not a service
+          const prod = await tx.product.findUnique({ where: { id: item.id } });
+          if (prod && !(prod as any).is_service) {
+            const currentStock = (prod as any).stock || 0;
+            const newStock = Math.max(0, currentStock - item.qty);
+            
+            await tx.product.update({
+              where: { id: item.id },
+              data: { stock: newStock } as any,
+            });
+
+            if (newStock <= 5) {
+               if (!alerts.includes(`Stok produk ${prod.name} menipis/habis (sisa ${newStock})`)) {
+                  alerts.push(`Stok produk ${prod.name} menipis/habis (sisa ${newStock})`);
+               }
+            }
+          }
         }
       }
 
-      return newTx;
+      return { newTx, alerts };
     });
 
-    res.json({ success: true, transaction });
+    res.json({ success: true, transaction: transaction.newTx, alerts: transaction.alerts });
   } catch (error) {
     console.error('Checkout error:', error);
     res.status(500).json({ error: 'Checkout failed' });

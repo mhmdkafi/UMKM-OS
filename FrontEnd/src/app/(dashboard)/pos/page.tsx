@@ -92,6 +92,12 @@ export default function PosInterface() {
         setQueueNumber(`A-${data.transaction.id.slice(0,4).toUpperCase()}`);
         setPaymentModalType(null);
         setShowReceipt(true);
+        
+        if (data.alerts && data.alerts.length > 0) {
+          setTimeout(() => {
+            alert("⚠️ PERINGATAN STOK:\n\n" + data.alerts.join("\n"));
+          }, 300);
+        }
       } else {
         alert("Gagal memproses pembayaran");
       }
