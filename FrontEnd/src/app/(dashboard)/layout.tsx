@@ -1,8 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { 
   LayoutDashboard, 
   ShoppingCart, 
@@ -17,7 +17,10 @@ import {
   User,
   Settings,
   Users,
-  Wallet
+  Wallet,
+  MessageSquare,
+  Send,
+  Minus
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 
@@ -27,8 +30,30 @@ export default function DashboardLayout({
   children: React.ReactNode;
 }) {
   const pathname = usePathname();
+  const router = useRouter();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [activeRole, setActiveRole] = useState<"owner" | "manager" | "kasir">("owner");
+  const [userName, setUserName] = useState("");
+  const [isProfileDropdownOpen, setIsProfileDropdownOpen] = useState(false);
+  const [isAiPopupOpen, setIsAiPopupOpen] = useState(false);
+  const [aiMessage, setAiMessage] = useState("");
+
+  useEffect(() => {
+    const userStr = localStorage.getItem('user');
+    const token = localStorage.getItem('token');
+    if (!userStr || !token) {
+      router.push('/login');
+      return;
+    }
+    try {
+      const user = JSON.parse(userStr);
+      setUserName(user.name || 'User');
+      const role = (user.role || 'OWNER').toLowerCase();
+      if (role === 'owner') setActiveRole('owner');
+      else if (role === 'manager' || role === 'admin') setActiveRole('manager');
+      else setActiveRole('kasir');
+    } catch { router.push('/login'); }
+  }, [router]);
 
   // Determine which navigation items to show based on the selected role (for demo purposes)
   const getNavItems = () => {
@@ -40,7 +65,6 @@ export default function DashboardLayout({
       { name: "Pengeluaran", href: "/expenses", icon: Wallet, roles: ["owner", "manager"] },
       { name: "Laporan Keuangan", href: "/reports", icon: PieChart, roles: ["owner"] },
       { name: "Manajemen Karyawan", href: "/employees", icon: Users, roles: ["owner"] },
-      { name: "AI Assistant", href: "/ai", icon: Sparkles, roles: ["owner"] },
     ];
     return allItems.filter(item => item.roles.includes(activeRole));
   };
@@ -107,10 +131,13 @@ export default function DashboardLayout({
         </div>
 
         <div className="p-4 border-t border-slate-200">
-          <Link href="/login" className="flex items-center gap-3 px-3 py-2.5 rounded-lg font-medium text-slate-600 hover:bg-red-50 hover:text-red-600 transition-colors">
-            <LogOut className="w-5 h-5 text-slate-400 group-hover:text-red-500" />
+          <button 
+            onClick={() => { localStorage.removeItem('token'); localStorage.removeItem('user'); router.push('/login'); }}
+            className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg font-medium text-slate-600 hover:bg-red-50 hover:text-red-600 transition-colors"
+          >
+            <LogOut className="w-5 h-5 text-slate-400" />
             Keluar
-          </Link>
+          </button>
         </div>
       </motion.div>
 
@@ -131,23 +158,54 @@ export default function DashboardLayout({
           </div>
 
           <div className="flex items-center gap-4">
-            {/* Role Selector (For Demo Purposes) */}
-            <div className="flex items-center gap-2 mr-4 border-r border-slate-200 pr-4">
-              <span className="text-xs text-slate-500 font-medium">Simulasi Role:</span>
-              <select 
-                value={activeRole} 
-                onChange={(e) => setActiveRole(e.target.value as any)}
-                className="text-sm bg-slate-50 border border-slate-200 rounded-md px-2 py-1 outline-none focus:border-indigo-500"
-              >
-                <option value="owner">Owner</option>
-                <option value="manager">Manager / Admin</option>
-                <option value="kasir">Kasir</option>
-              </select>
-            </div>
 
-            <button className="w-8 h-8 rounded-full bg-indigo-100 flex items-center justify-center border border-indigo-200">
-              <User className="w-4 h-4 text-indigo-700" />
-            </button>
+            <div className="relative">
+              <button 
+                onClick={() => setIsProfileDropdownOpen(!isProfileDropdownOpen)}
+                className="flex items-center gap-2 hover:bg-slate-50 p-1.5 rounded-lg transition-colors focus:outline-none"
+              >
+                <div className="w-8 h-8 rounded-full bg-indigo-100 flex items-center justify-center border border-indigo-200">
+                  <User className="w-4 h-4 text-indigo-700" />
+                </div>
+                {userName && <span className="text-sm font-medium text-slate-700 hidden sm:block">{userName}</span>}
+              </button>
+
+              <AnimatePresence>
+                {isProfileDropdownOpen && (
+                  <>
+                    <div 
+                      className="fixed inset-0 z-40" 
+                      onClick={() => setIsProfileDropdownOpen(false)}
+                    ></div>
+                    <motion.div 
+                      initial={{ opacity: 0, y: 10, scale: 0.95 }}
+                      animate={{ opacity: 1, y: 0, scale: 1 }}
+                      exit={{ opacity: 0, y: 10, scale: 0.95 }}
+                      transition={{ duration: 0.15 }}
+                      className="absolute right-0 mt-2 w-48 bg-white rounded-xl shadow-lg border border-slate-200 z-50 overflow-hidden"
+                    >
+                      <div className="py-1">
+                        <div className="px-4 py-2 border-b border-slate-100">
+                          <p className="text-xs text-slate-500 font-medium">Masuk sebagai</p>
+                          <p className="text-sm font-bold text-slate-900 truncate">{userName}</p>
+                        </div>
+                        <button 
+                          onClick={() => {
+                            localStorage.removeItem('token');
+                            localStorage.removeItem('user');
+                            router.push('/login');
+                          }}
+                          className="w-full text-left px-4 py-2.5 text-sm font-medium text-red-600 hover:bg-red-50 flex items-center gap-2 transition-colors"
+                        >
+                          <LogOut className="w-4 h-4" />
+                          Keluar Akun
+                        </button>
+                      </div>
+                    </motion.div>
+                  </>
+                )}
+              </AnimatePresence>
+            </div>
           </div>
         </header>
 
@@ -156,6 +214,76 @@ export default function DashboardLayout({
           {children}
         </main>
       </div>
+
+      {/* Floating AI Assistant Widget */}
+      {activeRole === "owner" && (
+        <div className="fixed bottom-6 right-6 z-50 flex flex-col items-end">
+          <AnimatePresence>
+            {isAiPopupOpen && (
+              <motion.div 
+                initial={{ opacity: 0, y: 20, scale: 0.95 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                exit={{ opacity: 0, y: 20, scale: 0.95 }}
+                className="bg-white rounded-2xl shadow-2xl border border-indigo-100 w-80 sm:w-96 mb-4 overflow-hidden flex flex-col"
+                style={{ height: '450px' }}
+              >
+                {/* Header AI */}
+                <div className="bg-indigo-600 p-4 flex justify-between items-center text-white rounded-t-2xl">
+                  <div className="flex items-center gap-2">
+                    <Sparkles className="w-5 h-5 text-indigo-200" />
+                    <div>
+                      <h3 className="font-bold text-sm">AI Business Assistant</h3>
+                      <p className="text-xs text-indigo-200">Online & siap membantu</p>
+                    </div>
+                  </div>
+                  <button onClick={() => setIsAiPopupOpen(false)} className="text-indigo-200 hover:text-white p-1 rounded-md transition-colors">
+                    <Minus className="w-5 h-5" />
+                  </button>
+                </div>
+
+                {/* Chat Area */}
+                <div className="flex-1 p-4 bg-slate-50/50 overflow-y-auto flex flex-col gap-3">
+                  <div className="self-start max-w-[85%] bg-white border border-slate-100 p-3 rounded-2xl rounded-tl-sm text-sm text-slate-700 shadow-sm">
+                    Halo {userName}! Saya AI Assistant dari UMKM OS. Ada yang bisa saya bantu hari ini? 
+                    Misalnya, Anda bisa bertanya "Berapa laba bersih minggu ini?"
+                  </div>
+                  {/* Fake user message example */}
+                  <div className="self-end max-w-[85%] bg-indigo-600 p-3 rounded-2xl rounded-tr-sm text-sm text-white shadow-sm">
+                    Berapa laba bersih minggu ini?
+                  </div>
+                  {/* Fake AI response example */}
+                  <div className="self-start max-w-[85%] bg-white border border-slate-100 p-3 rounded-2xl rounded-tl-sm text-sm text-slate-700 shadow-sm">
+                    Laba bersih minggu ini adalah <strong>Rp 4.500.000</strong> (naik 12% dari minggu lalu). Pengeluaran terbesar Anda adalah untuk biaya operasional marketing.
+                  </div>
+                </div>
+
+                {/* Input Area */}
+                <div className="p-3 bg-white border-t border-slate-100">
+                  <form onSubmit={(e) => { e.preventDefault(); setAiMessage(''); }} className="flex gap-2">
+                    <input 
+                      type="text" 
+                      value={aiMessage}
+                      onChange={(e) => setAiMessage(e.target.value)}
+                      placeholder="Ketik pesan Anda..." 
+                      className="flex-1 bg-slate-50 border border-slate-200 rounded-full px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-all"
+                    />
+                    <button type="submit" disabled={!aiMessage.trim()} className="bg-indigo-600 text-white p-2.5 rounded-full hover:bg-indigo-700 disabled:opacity-50 disabled:hover:bg-indigo-600 transition-colors">
+                      <Send className="w-4 h-4" />
+                    </button>
+                  </form>
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+
+          <button 
+            onClick={() => setIsAiPopupOpen(!isAiPopupOpen)}
+            className={`w-14 h-14 rounded-full flex items-center justify-center text-white shadow-xl shadow-indigo-600/30 transition-transform hover:scale-105 active:scale-95 ${isAiPopupOpen ? 'bg-slate-800' : 'bg-indigo-600'}`}
+          >
+            {isAiPopupOpen ? <X className="w-6 h-6" /> : <MessageSquare className="w-6 h-6" />}
+          </button>
+        </div>
+      )}
     </div>
   );
 }

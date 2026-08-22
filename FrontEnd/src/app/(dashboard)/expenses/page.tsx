@@ -1,20 +1,32 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Plus, Search, DollarSign, ArrowDownRight, Tag, Calendar, Edit3, Trash2 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 
-const initialExpenses = [
-  { id: 1, name: "Gaji Karyawan (Agustus)", amount: 12000000, category: "Tetap (Fixed)", date: "2026-08-01", notes: "Gaji 1 Manajer, 2 Kasir" },
-  { id: 2, name: "Sewa Tempat Bulanan", amount: 5000000, category: "Tetap (Fixed)", date: "2026-08-05", notes: "Ruko lantai 1" },
-  { id: 3, name: "Listrik & Air", amount: 2500000, category: "Variabel (Variable)", date: "2026-08-10", notes: "Token listrik & tagihan PAM" },
-  { id: 4, name: "Iklan Instagram (Ads)", amount: 1000000, category: "Pemasaran (Marketing)", date: "2026-08-15", notes: "Promo kemerdekaan" },
-];
+const API = 'http://localhost:5000/api';
 
 export default function ExpensesPage() {
-  const [expenses, setExpenses] = useState(initialExpenses);
+  const [expenses, setExpenses] = useState<any[]>([]);
   const [search, setSearch] = useState("");
   const [isModalOpen, setIsModalOpen] = useState(false);
+
+  const fetchExpenses = () => {
+    fetch(`${API}/expenses`)
+      .then(res => res.json())
+      .then(data => setExpenses(data))
+      .catch(console.error);
+  };
+
+  useEffect(() => { fetchExpenses(); }, []);
+
+  const handleDeleteExpense = async (id: string) => {
+    if (!confirm('Hapus pengeluaran ini?')) return;
+    try {
+      await fetch(`${API}/expenses/${id}`, { method: 'DELETE' });
+      fetchExpenses();
+    } catch (err) { console.error(err); }
+  };
 
   // Form State
   const [newName, setNewName] = useState("");
@@ -30,28 +42,33 @@ export default function ExpensesPage() {
 
   const totalExpenses = filteredExpenses.reduce((sum, exp) => sum + exp.amount, 0);
 
-  const handleAddExpense = (e: React.FormEvent) => {
+  const handleAddExpense = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newName || !newAmount || !newDate) return;
 
-    setExpenses([
-      {
-        id: Date.now(),
-        name: newName,
-        amount: parseInt(newAmount),
-        category: newCategory,
-        date: newDate,
-        notes: newNotes
-      },
-      ...expenses
-    ]);
-    
-    setIsModalOpen(false);
-    setNewName("");
-    setNewAmount("");
-    setNewCategory("Variabel (Variable)");
-    setNewDate("");
-    setNewNotes("");
+    try {
+      const response = await fetch(`${API}/expenses`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: newName,
+          amount: newAmount,
+          category: newCategory,
+          date: newDate,
+          notes: newNotes
+        })
+      });
+      
+      const data = await response.json();
+      if (data.success) {
+        fetchExpenses();
+        setIsModalOpen(false);
+        setNewName(""); setNewAmount(""); setNewCategory("Variabel (Variable)"); setNewDate(""); setNewNotes("");
+      }
+    } catch (err) {
+      console.error(err);
+      alert('Failed to save expense');
+    }
   };
 
   return (
@@ -145,7 +162,7 @@ export default function ExpensesPage() {
                       <button className="p-2 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors">
                         <Edit3 className="w-4 h-4" />
                       </button>
-                      <button className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors">
+                      <button onClick={() => handleDeleteExpense(exp.id)} className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors">
                         <Trash2 className="w-4 h-4" />
                       </button>
                     </div>

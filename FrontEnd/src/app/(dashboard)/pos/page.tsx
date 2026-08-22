@@ -1,21 +1,25 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Search, Plus, Minus, Trash2, CreditCard, Banknote, ShoppingCart, X, CheckCircle2, User, QrCode, Receipt } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 
-const dummyProducts = [
-  { id: 1, name: "Kopi Susu Aren", price: 20000, category: "Kopi", stock: 45, image: "https://images.unsplash.com/photo-1572442388796-11668a67e53d?w=500&q=80" },
-  { id: 2, name: "Americano", price: 15000, category: "Kopi", stock: 120, image: "https://images.unsplash.com/photo-1551030173-122aabc4489c?w=500&q=80" },
-  { id: 3, name: "Matcha Latte", price: 25000, category: "Non-Kopi", stock: 30, image: "https://images.unsplash.com/photo-1536514072410-5019a3c69182?w=500&q=80" },
-  { id: 4, name: "Caffe Latte", price: 22000, category: "Kopi", stock: 50, image: "https://images.unsplash.com/photo-1570968915860-54d5c301fa9f?w=500&q=80" },
-  { id: 5, name: "Croissant Butter", price: 18000, category: "Makanan", stock: 12, image: "https://images.unsplash.com/photo-1517433627367-17b5e43bc047?w=500&q=80" },
-  { id: 6, name: "Chocolate Muffin", price: 15000, category: "Makanan", stock: 5, image: "https://images.unsplash.com/photo-1607958996333-41aef7caefaa?w=500&q=80" },
-  { id: 7, name: "Red Velvet Cake", price: 28000, category: "Makanan", stock: 20, image: "https://images.unsplash.com/photo-1586788224331-947f68671caf?w=500&q=80" },
-  { id: 8, name: "Teh Tarik", price: 12000, category: "Non-Kopi", stock: 60, image: "https://images.unsplash.com/photo-1556679343-c7306c1976bc?w=500&q=80" },
-];
-
 export default function PosInterface() {
+  const [products, setProducts] = useState<any[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    fetch('http://localhost:5000/api/products')
+      .then(res => res.json())
+      .then(data => {
+        setProducts(data);
+        setIsLoading(false);
+      })
+      .catch(err => {
+        console.error("Failed to load products:", err);
+        setIsLoading(false);
+      });
+  }, []);
   const [cart, setCart] = useState<any[]>([]);
   const [search, setSearch] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("Semua");
@@ -28,9 +32,9 @@ export default function PosInterface() {
   const [showReceipt, setShowReceipt] = useState(false);
   const [queueNumber, setQueueNumber] = useState("");
 
-  const categories = ["Semua", ...Array.from(new Set(dummyProducts.map(p => p.category)))];
+  const categories = ["Semua", ...Array.from(new Set(products.map(p => p.category)))];
 
-  const filteredProducts = dummyProducts.filter(p => {
+  const filteredProducts = products.filter(p => {
     const matchCat = selectedCategory === "Semua" || p.category === selectedCategory;
     const matchSearch = p.name.toLowerCase().includes(search.toLowerCase());
     return matchCat && matchSearch;
@@ -63,16 +67,38 @@ export default function PosInterface() {
   const tax = subtotal * 0.11; // PPN 11%
   const total = subtotal + tax;
 
-  const handleProcessPayment = (e: React.FormEvent) => {
+  const handleProcessPayment = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!customerName) return;
     
-    // Generate Random Queue Number
-    const randomQueue = Math.floor(Math.random() * 99) + 1;
-    setQueueNumber(`A-${randomQueue.toString().padStart(3, '0')}`);
-    
-    setPaymentModalType(null);
-    setShowReceipt(true);
+    // POST to backend API
+    try {
+      const response = await fetch('http://localhost:5000/api/pos/checkout', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          business_id: products[0]?.business_id || "fallback-id", // usually from auth context
+          cashier_id: "cashier-1",
+          customer_name: customerName,
+          total_amount: total,
+          payment_method: paymentModalType?.toUpperCase(),
+          items: cart
+        })
+      });
+      
+      const data = await response.json();
+      if (data.success) {
+        // Use generated transaction ID for queue number if possible, or random
+        setQueueNumber(`A-${data.transaction.id.slice(0,4).toUpperCase()}`);
+        setPaymentModalType(null);
+        setShowReceipt(true);
+      } else {
+        alert("Gagal memproses pembayaran");
+      }
+    } catch (err) {
+      console.error(err);
+      alert("Error menghubungi server backend");
+    }
   };
 
   const handleFinishTransaction = () => {
@@ -126,7 +152,10 @@ export default function PosInterface() {
 
         {/* Product Grid */}
         <div className="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8 pb-32 md:pb-8">
-          <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-6">
+          {isLoading ? (
+            <div className="flex items-center justify-center h-full text-slate-500 font-medium">Memuat data produk dari Backend API...</div>
+          ) : (
+            <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-6">
             <AnimatePresence>
               {filteredProducts.map(product => {
                 const qtyInCart = cart.find(item => item.id === product.id)?.qty || 0;
@@ -175,6 +204,7 @@ export default function PosInterface() {
               })}
             </AnimatePresence>
           </div>
+          )}
         </div>
 
         {/* Mobile Cart Floating Bar */}

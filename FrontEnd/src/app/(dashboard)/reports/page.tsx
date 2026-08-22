@@ -1,12 +1,38 @@
 "use client";
 
+import { useState, useEffect } from "react";
 import { Download, FileText, Calendar, Printer } from "lucide-react";
 import { motion } from "framer-motion";
 
+const API = 'http://localhost:5000/api';
+const fmt = (v: number) => `Rp ${v.toLocaleString('id-ID')}`;
+
 export default function ReportsPage() {
+  const [report, setReport] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    fetch(`${API}/dashboard/reports`)
+      .then(res => res.json())
+      .then(data => { setReport(data); setLoading(false); })
+      .catch(err => { console.error(err); setLoading(false); });
+  }, []);
+
   const handlePrint = () => {
     window.print();
   };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-96">
+        <div className="text-slate-500 font-medium">Memuat laporan keuangan dari Database...</div>
+      </div>
+    );
+  }
+
+  const pendapatan = report?.pendapatan || { total: 0, jumlahTransaksi: 0 };
+  const pengeluaran = report?.pengeluaran || { total: 0, byCategory: {}, items: [] };
+  const labaRugi = report?.labaRugi || 0;
 
   return (
     <div className="space-y-6 max-w-5xl mx-auto">
@@ -14,7 +40,7 @@ export default function ReportsPage() {
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 print:hidden">
         <div>
           <h2 className="text-2xl font-bold text-slate-900">Laporan Keuangan</h2>
-          <p className="text-slate-500">Laba Rugi (Income Statement) Periode Agustus 2026</p>
+          <p className="text-slate-500">Laba Rugi (Income Statement) — Data real-time dari Database</p>
         </div>
         <div className="flex gap-2">
           <button 
@@ -38,7 +64,7 @@ export default function ReportsPage() {
           </div>
           <div className="text-right">
             <p className="text-sm font-semibold text-slate-800">Periode:</p>
-            <p className="text-sm text-slate-600">01 Agustus 2026 - 31 Agustus 2026</p>
+            <p className="text-sm text-slate-600">All-Time (Data dari Database)</p>
             <p className="text-sm text-slate-400 mt-2">Dicetak pada: {new Date().toLocaleDateString('id-ID')}</p>
           </div>
         </div>
@@ -52,41 +78,12 @@ export default function ReportsPage() {
             <table className="w-full text-sm">
               <tbody>
                 <tr className="border-b border-slate-100">
-                  <td className="py-2 pl-4 text-slate-700">Pendapatan Penjualan Kopi</td>
-                  <td className="py-2 text-right font-medium text-slate-900">Rp 45.500.000</td>
-                </tr>
-                <tr className="border-b border-slate-100">
-                  <td className="py-2 pl-4 text-slate-700">Pendapatan Penjualan Makanan</td>
-                  <td className="py-2 text-right font-medium text-slate-900">Rp 12.300.000</td>
+                  <td className="py-2 pl-4 text-slate-700">Total Pendapatan Penjualan ({pendapatan.jumlahTransaksi} transaksi)</td>
+                  <td className="py-2 text-right font-medium text-slate-900">{fmt(pendapatan.total)}</td>
                 </tr>
                 <tr className="bg-slate-50 font-bold text-slate-900 border-t-2 border-slate-200">
                   <td className="py-3 pl-4">TOTAL PENDAPATAN KOTOR</td>
-                  <td className="py-3 text-right">Rp 57.800.000</td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-
-          {/* HPP (Harga Pokok Penjualan) */}
-          <div>
-            <h3 className="font-bold text-slate-900 text-lg mb-3">Harga Pokok Penjualan (HPP)</h3>
-            <table className="w-full text-sm">
-              <tbody>
-                <tr className="border-b border-slate-100">
-                  <td className="py-2 pl-4 text-slate-700">Bahan Baku Awal</td>
-                  <td className="py-2 text-right font-medium text-slate-900">Rp 8.000.000</td>
-                </tr>
-                <tr className="border-b border-slate-100">
-                  <td className="py-2 pl-4 text-slate-700">Pembelian Bahan Baku</td>
-                  <td className="py-2 text-right font-medium text-slate-900">Rp 20.000.000</td>
-                </tr>
-                <tr className="border-b border-slate-100">
-                  <td className="py-2 pl-4 text-slate-700">Bahan Baku Akhir</td>
-                  <td className="py-2 text-right font-medium text-slate-900">(Rp 5.500.000)</td>
-                </tr>
-                <tr className="bg-slate-50 font-bold text-slate-900 border-t-2 border-slate-200">
-                  <td className="py-3 pl-4">TOTAL HPP</td>
-                  <td className="py-3 text-right">Rp 22.500.000</td>
+                  <td className="py-3 text-right">{fmt(pendapatan.total)}</td>
                 </tr>
               </tbody>
             </table>
@@ -94,8 +91,8 @@ export default function ReportsPage() {
 
           {/* Laba Kotor */}
           <div className="bg-indigo-50 border-y-2 border-indigo-200 py-3 px-4 flex justify-between font-bold text-indigo-900 text-lg">
-            <span>LABA KOTOR</span>
-            <span>Rp 35.300.000</span>
+            <span>PENDAPATAN KOTOR</span>
+            <span>{fmt(pendapatan.total)}</span>
           </div>
 
           {/* Pengeluaran Operasional */}
@@ -103,34 +100,24 @@ export default function ReportsPage() {
             <h3 className="font-bold text-slate-900 text-lg mb-3">Pengeluaran Operasional</h3>
             <table className="w-full text-sm">
               <tbody>
-                <tr className="border-b border-slate-100">
-                  <td className="py-2 pl-4 text-slate-700">Gaji Karyawan</td>
-                  <td className="py-2 text-right font-medium text-slate-900">Rp 12.000.000</td>
-                </tr>
-                <tr className="border-b border-slate-100">
-                  <td className="py-2 pl-4 text-slate-700">Sewa Tempat</td>
-                  <td className="py-2 text-right font-medium text-slate-900">Rp 5.000.000</td>
-                </tr>
-                <tr className="border-b border-slate-100">
-                  <td className="py-2 pl-4 text-slate-700">Listrik, Air & Internet</td>
-                  <td className="py-2 text-right font-medium text-slate-900">Rp 2.500.000</td>
-                </tr>
-                <tr className="border-b border-slate-100">
-                  <td className="py-2 pl-4 text-slate-700">Pemasaran (Ads)</td>
-                  <td className="py-2 text-right font-medium text-slate-900">Rp 1.000.000</td>
-                </tr>
+                {pengeluaran.items.map((exp: any, i: number) => (
+                  <tr key={i} className="border-b border-slate-100">
+                    <td className="py-2 pl-4 text-slate-700">{exp.name}</td>
+                    <td className="py-2 text-right font-medium text-slate-900">{fmt(exp.amount)}</td>
+                  </tr>
+                ))}
                 <tr className="bg-slate-50 font-bold text-slate-900 border-t-2 border-slate-200">
                   <td className="py-3 pl-4">TOTAL PENGELUARAN</td>
-                  <td className="py-3 text-right">Rp 20.500.000</td>
+                  <td className="py-3 text-right">{fmt(pengeluaran.total)}</td>
                 </tr>
               </tbody>
             </table>
           </div>
 
           {/* Laba Bersih */}
-          <div className="bg-emerald-50 border-y-4 border-emerald-500 py-4 px-4 flex justify-between items-center">
-            <span className="font-bold text-emerald-900 text-xl tracking-tight">LABA BERSIH (NET PROFIT)</span>
-            <span className="font-black text-emerald-700 text-2xl">Rp 14.800.000</span>
+          <div className={`border-y-4 py-4 px-4 flex justify-between items-center ${labaRugi >= 0 ? 'bg-emerald-50 border-emerald-500' : 'bg-red-50 border-red-500'}`}>
+            <span className={`font-bold text-xl tracking-tight ${labaRugi >= 0 ? 'text-emerald-900' : 'text-red-900'}`}>LABA BERSIH (NET PROFIT)</span>
+            <span className={`font-black text-2xl ${labaRugi >= 0 ? 'text-emerald-700' : 'text-red-700'}`}>{fmt(labaRugi)}</span>
           </div>
         </div>
 
@@ -148,13 +135,12 @@ export default function ReportsPage() {
 
       </div>
 
-      {/* CSS untuk menyembunyikan elemen UI (Sidebar, Header, Button) saat di-print (PDF) */}
+      {/* CSS untuk menyembunyikan elemen UI saat di-print (PDF) */}
       <style dangerouslySetInnerHTML={{__html: `
         @media print {
           body {
             background-color: white !important;
           }
-          /* Hide the left sidebar and top header from layout.tsx */
           header, nav, .fixed {
             display: none !important;
           }

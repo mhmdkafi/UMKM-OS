@@ -1,25 +1,94 @@
 "use client";
 
-import { useState } from "react";
-import { Plus, Search, Filter, AlertTriangle, ArrowDownToLine, ArrowUpRight, History } from "lucide-react";
-import { motion } from "framer-motion";
+import { useState, useEffect } from "react";
+import { Plus, Search, Filter, AlertTriangle, ArrowDownToLine, ArrowUpRight, History, Trash2, X } from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
 
-const dummyInventory = [
-  { id: 1, name: "Biji Kopi Robusta", category: "Bahan Baku", stock: 12, unit: "Kg", minStock: 5, lastUpdate: "2026-08-20", status: "Aman" },
-  { id: 2, name: "Biji Kopi Arabica", category: "Bahan Baku", stock: 8, unit: "Kg", minStock: 5, lastUpdate: "2026-08-21", status: "Aman" },
-  { id: 3, name: "Susu UHT Full Cream", category: "Bahan Baku", stock: 2, unit: "Liter", minStock: 10, lastUpdate: "2026-08-21", status: "Kritis" },
-  { id: 4, name: "Gula Aren Cair", category: "Bahan Baku", stock: 1, unit: "Liter", minStock: 3, lastUpdate: "2026-08-19", status: "Kritis" },
-  { id: 5, name: "Cup Plastik 16oz", category: "Packaging", stock: 450, unit: "Pcs", minStock: 200, lastUpdate: "2026-08-15", status: "Aman" },
-  { id: 6, name: "Sedotan Ramah Lingkungan", category: "Packaging", stock: 800, unit: "Pcs", minStock: 300, lastUpdate: "2026-08-15", status: "Aman" },
-];
+const API = 'http://localhost:5000/api';
 
 export default function InventoryPage() {
   const [search, setSearch] = useState("");
+  const [inventory, setInventory] = useState<any[]>([]);
+  const [showAdjustModal, setShowAdjustModal] = useState(false);
+  const [showAddModal, setShowAddModal] = useState(false);
+  const [selectedItem, setSelectedItem] = useState<any>(null);
+  const [adjustType, setAdjustType] = useState<'in' | 'out'>('in');
+  const [adjustAmount, setAdjustAmount] = useState("");
+  const [adjustNotes, setAdjustNotes] = useState("");
 
-  const filteredInventory = dummyInventory.filter(item => 
+  // Add form state
+  const [newName, setNewName] = useState("");
+  const [newUnit, setNewUnit] = useState("Gram");
+  const [newStock, setNewStock] = useState("");
+  const [newMinStock, setNewMinStock] = useState("");
+
+  const fetchInventory = () => {
+    fetch(`${API}/inventory`)
+      .then(res => res.json())
+      .then(data => setInventory(data))
+      .catch(console.error);
+  };
+
+  useEffect(() => { fetchInventory(); }, []);
+
+  const filteredInventory = inventory.filter(item => 
     item.name.toLowerCase().includes(search.toLowerCase()) || 
     item.category.toLowerCase().includes(search.toLowerCase())
   );
+
+  const totalItems = inventory.length;
+  const criticalItems = inventory.filter(i => i.status === 'Kritis' || i.status === 'Menipis').length;
+
+  const handleAdjust = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedItem || !adjustAmount) return;
+    try {
+      await fetch(`${API}/inventory/adjust`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          id: selectedItem.id,
+          type: adjustType,
+          amount: parseFloat(adjustAmount),
+          notes: adjustNotes || `${adjustType === 'in' ? 'Stock In' : 'Stock Out'} manual`,
+        }),
+      });
+      setShowAdjustModal(false);
+      setAdjustAmount("");
+      setAdjustNotes("");
+      fetchInventory();
+    } catch (err) { console.error(err); }
+  };
+
+  const handleAdd = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newName || !newStock) return;
+    try {
+      const biz = inventory[0]?.business_id;
+      await fetch(`${API}/inventory`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          business_id: biz,
+          name: newName,
+          unit: newUnit,
+          stock: newStock,
+          min_stock_alert: newMinStock || "0",
+        }),
+      });
+      setShowAddModal(false);
+      setNewName(""); setNewUnit("Gram"); setNewStock(""); setNewMinStock("");
+      fetchInventory();
+    } catch (err) { console.error(err); }
+  };
+
+  const handleDelete = async (id: string) => {
+    if (!confirm('Hapus bahan baku ini?')) return;
+    try {
+      await fetch(`${API}/inventory/${id}`, { method: 'DELETE' });
+      fetchInventory();
+    } catch (err) { console.error(err); }
+  };
 
   return (
     <div className="space-y-6 max-w-7xl mx-auto">
@@ -29,13 +98,9 @@ export default function InventoryPage() {
           <p className="text-slate-500">Pantau pergerakan stok dan ketersediaan bahan baku.</p>
         </div>
         <div className="flex gap-2">
-          <button className="flex items-center gap-2 bg-white border border-slate-200 text-slate-700 px-4 py-2 rounded-lg font-medium hover:bg-slate-50 transition-colors shadow-sm">
-            <ArrowDownToLine className="w-4 h-4" />
-            Stock In
-          </button>
-          <button className="flex items-center gap-2 bg-indigo-600 text-white px-4 py-2 rounded-lg font-medium hover:bg-indigo-700 transition-colors shadow-sm">
-            <History className="w-4 h-4" />
-            Opname / Adjust
+          <button onClick={() => setShowAddModal(true)} className="flex items-center gap-2 bg-white border border-slate-200 text-slate-700 px-4 py-2 rounded-lg font-medium hover:bg-slate-50 transition-colors shadow-sm">
+            <Plus className="w-4 h-4" />
+            Tambah Bahan
           </button>
         </div>
       </div>
@@ -48,7 +113,7 @@ export default function InventoryPage() {
           </div>
           <div>
             <p className="text-sm font-medium text-slate-500">Total Item (SKU)</p>
-            <h4 className="text-2xl font-bold text-slate-900">124</h4>
+            <h4 className="text-2xl font-bold text-slate-900">{totalItems}</h4>
           </div>
         </div>
         <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm flex items-center gap-4">
@@ -56,8 +121,8 @@ export default function InventoryPage() {
             <AlertTriangle className="w-6 h-6" />
           </div>
           <div>
-            <p className="text-sm font-medium text-slate-500">Stok Kritis / Habis</p>
-            <h4 className="text-2xl font-bold text-slate-900">2 Item</h4>
+            <p className="text-sm font-medium text-slate-500">Stok Kritis / Menipis</p>
+            <h4 className="text-2xl font-bold text-slate-900">{criticalItems} Item</h4>
           </div>
         </div>
         <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm flex items-center gap-4">
@@ -65,8 +130,8 @@ export default function InventoryPage() {
             <ArrowUpRight className="w-6 h-6" />
           </div>
           <div>
-            <p className="text-sm font-medium text-slate-500">Nilai Aset Gudang (WAC)</p>
-            <h4 className="text-2xl font-bold text-slate-900">Rp 12.450.000</h4>
+            <p className="text-sm font-medium text-slate-500">Stok Aman</p>
+            <h4 className="text-2xl font-bold text-slate-900">{totalItems - criticalItems} Item</h4>
           </div>
         </div>
       </div>
@@ -83,13 +148,9 @@ export default function InventoryPage() {
               placeholder="Cari bahan baku..." 
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="block w-full pl-9 pr-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              className="block w-full pl-9 pr-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 text-slate-900"
             />
           </div>
-          <button className="flex items-center gap-2 text-sm font-medium text-slate-600 bg-white border border-slate-200 px-3 py-2 rounded-lg hover:bg-slate-50 w-full sm:w-auto justify-center">
-            <Filter className="w-4 h-4" />
-            Filter Kategori
-          </button>
         </div>
         
         <div className="overflow-x-auto">
@@ -97,7 +158,6 @@ export default function InventoryPage() {
             <thead>
               <tr className="bg-white border-b border-slate-200 text-sm text-slate-500">
                 <th className="py-4 px-6 font-medium">Nama Barang</th>
-                <th className="py-4 px-6 font-medium">Kategori</th>
                 <th className="py-4 px-6 font-medium">Stok Tersedia</th>
                 <th className="py-4 px-6 font-medium">Batas Minimum</th>
                 <th className="py-4 px-6 font-medium">Status</th>
@@ -114,15 +174,14 @@ export default function InventoryPage() {
                 >
                   <td className="py-4 px-6">
                     <p className="font-semibold text-slate-900">{item.name}</p>
-                    <p className="text-xs text-slate-400 mt-1">Diupdate: {item.lastUpdate}</p>
+                    <p className="text-xs text-slate-400 mt-1">Update: {item.lastUpdate}</p>
                   </td>
-                  <td className="py-4 px-6 text-sm text-slate-600">{item.category}</td>
                   <td className="py-4 px-6">
                     <span className="font-semibold text-slate-900">{item.stock}</span> {item.unit}
                   </td>
                   <td className="py-4 px-6 text-sm text-slate-600">{item.minStock} {item.unit}</td>
                   <td className="py-4 px-6">
-                    {item.status === 'Kritis' ? (
+                    {item.status === 'Kritis' || item.status === 'Menipis' ? (
                       <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-red-50 text-red-700 border border-red-200">
                         <span className="w-1.5 h-1.5 rounded-full bg-red-500"></span>
                         {item.status}
@@ -135,9 +194,14 @@ export default function InventoryPage() {
                     )}
                   </td>
                   <td className="py-4 px-6 text-right">
-                    <button className="text-indigo-600 hover:text-indigo-900 text-sm font-medium">
-                      Detail
-                    </button>
+                    <div className="flex justify-end gap-2">
+                      <button onClick={() => { setSelectedItem(item); setAdjustType('in'); setShowAdjustModal(true); }} className="text-indigo-600 hover:text-indigo-900 text-sm font-medium px-2 py-1 rounded hover:bg-indigo-50">
+                        Adjust
+                      </button>
+                      <button onClick={() => handleDelete(item.id)} className="text-red-500 hover:text-red-700 p-1 rounded hover:bg-red-50">
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
                   </td>
                 </motion.tr>
               ))}
@@ -151,6 +215,72 @@ export default function InventoryPage() {
           )}
         </div>
       </div>
+
+      {/* Adjust Stock Modal */}
+      <AnimatePresence>
+        {showAdjustModal && selectedItem && (
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+            <motion.div initial={{ scale: 0.95 }} animate={{ scale: 1 }} exit={{ scale: 0.95 }} className="bg-white rounded-2xl w-full max-w-md p-6 shadow-2xl">
+              <div className="flex justify-between items-center mb-6">
+                <h3 className="text-lg font-bold text-slate-900">Adjust Stok: {selectedItem.name}</h3>
+                <button onClick={() => setShowAdjustModal(false)} className="text-slate-400 hover:text-slate-600"><X className="w-5 h-5" /></button>
+              </div>
+              <form onSubmit={handleAdjust} className="space-y-4">
+                <div className="flex gap-2">
+                  <button type="button" onClick={() => setAdjustType('in')} className={`flex-1 py-2 rounded-lg font-medium text-sm ${adjustType === 'in' ? 'bg-emerald-600 text-white' : 'bg-slate-100 text-slate-600'}`}>Stock In (+)</button>
+                  <button type="button" onClick={() => setAdjustType('out')} className={`flex-1 py-2 rounded-lg font-medium text-sm ${adjustType === 'out' ? 'bg-red-600 text-white' : 'bg-slate-100 text-slate-600'}`}>Stock Out (-)</button>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">Jumlah ({selectedItem.unit})</label>
+                  <input type="number" value={adjustAmount} onChange={e => setAdjustAmount(e.target.value)} required className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none text-slate-900" placeholder="Contoh: 500" />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">Catatan</label>
+                  <input type="text" value={adjustNotes} onChange={e => setAdjustNotes(e.target.value)} className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none text-slate-900" placeholder="Beli dari supplier, dll" />
+                </div>
+                <button type="submit" className="w-full bg-indigo-600 text-white py-2.5 rounded-lg font-medium hover:bg-indigo-700 transition-colors">Simpan Adjustment</button>
+              </form>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Add Ingredient Modal */}
+      <AnimatePresence>
+        {showAddModal && (
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+            <motion.div initial={{ scale: 0.95 }} animate={{ scale: 1 }} exit={{ scale: 0.95 }} className="bg-white rounded-2xl w-full max-w-md p-6 shadow-2xl">
+              <div className="flex justify-between items-center mb-6">
+                <h3 className="text-lg font-bold text-slate-900">Tambah Bahan Baku</h3>
+                <button onClick={() => setShowAddModal(false)} className="text-slate-400 hover:text-slate-600"><X className="w-5 h-5" /></button>
+              </div>
+              <form onSubmit={handleAdd} className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">Nama Bahan</label>
+                  <input type="text" value={newName} onChange={e => setNewName(e.target.value)} required className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none text-slate-900" placeholder="Contoh: Susu Almond" />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">Satuan</label>
+                  <select value={newUnit} onChange={e => setNewUnit(e.target.value)} className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none text-slate-900">
+                    <option>Gram</option><option>Kg</option><option>ml</option><option>Liter</option><option>Pcs</option>
+                  </select>
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-1">Stok Awal</label>
+                    <input type="number" value={newStock} onChange={e => setNewStock(e.target.value)} required className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none text-slate-900" />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-1">Batas Minimum</label>
+                    <input type="number" value={newMinStock} onChange={e => setNewMinStock(e.target.value)} className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none text-slate-900" />
+                  </div>
+                </div>
+                <button type="submit" className="w-full bg-indigo-600 text-white py-2.5 rounded-lg font-medium hover:bg-indigo-700 transition-colors">Simpan</button>
+              </form>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

@@ -1,10 +1,58 @@
 "use client";
 
+import { useState } from "react";
 import { motion } from "framer-motion";
-import { TrendingUp, Mail, Lock, User, Store, Briefcase, ArrowRight } from "lucide-react";
+import { TrendingUp, Mail, Lock, User, Store, Briefcase, ArrowRight, Loader2 } from "lucide-react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
+
+const API = 'http://localhost:5000/api';
 
 export default function RegisterPage() {
+  const router = useRouter();
+  const [name, setName] = useState("");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [businessName, setBusinessName] = useState("");
+  const [businessCategory, setBusinessCategory] = useState("");
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
+
+  const handleRegister = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError("");
+    setLoading(true);
+
+    try {
+      const res = await fetch(`${API}/auth/register`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name,
+          email,
+          password,
+          business_name: businessName,
+          business_category: businessCategory,
+        }),
+      });
+
+      const data = await res.json();
+
+      if (data.success) {
+        // Store token and user info
+        localStorage.setItem('token', data.token);
+        localStorage.setItem('user', JSON.stringify(data.user));
+        router.push('/dashboard');
+      } else {
+        setError(data.error || "Registrasi gagal. Silakan coba lagi.");
+      }
+    } catch (err) {
+      setError("Gagal terhubung ke server. Pastikan backend berjalan di port 5000.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col justify-center py-12 sm:px-6 lg:px-8 selection:bg-indigo-100 selection:text-indigo-900">
       <div className="sm:mx-auto sm:w-full sm:max-w-md">
@@ -50,7 +98,12 @@ export default function RegisterPage() {
         className="mt-8 sm:mx-auto sm:w-full sm:max-w-xl"
       >
         <div className="bg-white py-8 px-4 shadow-xl shadow-slate-200/50 sm:rounded-2xl sm:px-10 border border-slate-100">
-          <form className="space-y-6" action="#" method="POST">
+          <form className="space-y-6" onSubmit={handleRegister}>
+            {error && (
+              <div className="bg-red-50 border border-red-200 rounded-lg p-3 text-sm text-red-700">
+                {error}
+              </div>
+            )}
             
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               {/* Personal Info */}
@@ -68,6 +121,8 @@ export default function RegisterPage() {
                       name="name"
                       type="text"
                       required
+                      value={name}
+                      onChange={(e) => setName(e.target.value)}
                       className="block w-full rounded-lg border-0 py-2.5 pl-10 text-slate-900 shadow-sm ring-1 ring-inset ring-slate-300 placeholder:text-slate-400 focus:ring-2 focus:ring-inset focus:ring-indigo-600 sm:text-sm sm:leading-6 transition-all"
                       placeholder="Budi Santoso"
                     />
@@ -88,6 +143,8 @@ export default function RegisterPage() {
                       type="email"
                       autoComplete="email"
                       required
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
                       className="block w-full rounded-lg border-0 py-2.5 pl-10 text-slate-900 shadow-sm ring-1 ring-inset ring-slate-300 placeholder:text-slate-400 focus:ring-2 focus:ring-inset focus:ring-indigo-600 sm:text-sm sm:leading-6 transition-all"
                       placeholder="anda@perusahaan.com"
                     />
@@ -107,8 +164,10 @@ export default function RegisterPage() {
                       name="password"
                       type="password"
                       required
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
                       className="block w-full rounded-lg border-0 py-2.5 pl-10 text-slate-900 shadow-sm ring-1 ring-inset ring-slate-300 placeholder:text-slate-400 focus:ring-2 focus:ring-inset focus:ring-indigo-600 sm:text-sm sm:leading-6 transition-all"
-                      placeholder="Minimal 8 karakter"
+                      placeholder="Minimal 6 karakter"
                     />
                   </div>
                 </div>
@@ -129,6 +188,8 @@ export default function RegisterPage() {
                       name="businessName"
                       type="text"
                       required
+                      value={businessName}
+                      onChange={(e) => setBusinessName(e.target.value)}
                       className="block w-full rounded-lg border-0 py-2.5 pl-10 text-slate-900 shadow-sm ring-1 ring-inset ring-slate-300 placeholder:text-slate-400 focus:ring-2 focus:ring-inset focus:ring-indigo-600 sm:text-sm sm:leading-6 transition-all"
                       placeholder="Toko Jaya Abadi"
                     />
@@ -147,6 +208,8 @@ export default function RegisterPage() {
                       id="businessCategory"
                       name="businessCategory"
                       required
+                      value={businessCategory}
+                      onChange={(e) => setBusinessCategory(e.target.value)}
                       className="block w-full rounded-lg border-0 py-2.5 pl-10 pr-10 text-slate-900 shadow-sm ring-1 ring-inset ring-slate-300 focus:ring-2 focus:ring-inset focus:ring-indigo-600 sm:text-sm sm:leading-6 transition-all bg-white"
                     >
                       <option value="">Pilih Kategori...</option>
@@ -164,9 +227,10 @@ export default function RegisterPage() {
             <div className="pt-4 border-t border-slate-100">
               <button
                 type="submit"
-                className="flex w-full justify-center items-center gap-2 rounded-lg bg-indigo-600 px-3 py-3 text-sm font-semibold text-white shadow-sm hover:bg-indigo-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600 transition-all hover:shadow-md hover:-translate-y-0.5"
+                disabled={loading}
+                className="flex w-full justify-center items-center gap-2 rounded-lg bg-indigo-600 px-3 py-3 text-sm font-semibold text-white shadow-sm hover:bg-indigo-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600 transition-all hover:shadow-md hover:-translate-y-0.5 disabled:opacity-50"
               >
-                Buat Akun Sekarang <ArrowRight className="w-4 h-4" />
+                {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <>Buat Akun Sekarang <ArrowRight className="w-4 h-4" /></>}
               </button>
             </div>
             

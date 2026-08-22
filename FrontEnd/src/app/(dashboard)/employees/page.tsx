@@ -1,52 +1,101 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Plus, Search, UserPlus, ShieldAlert, Edit3, Trash2, KeyRound, Mail } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 
-const initialEmployees = [
-  { id: 1, name: "Budi Santoso", role: "Owner", accessType: "Email", accessValue: "budi@umkmos.com", status: "Aktif" },
-  { id: 2, name: "Siti Aminah", role: "Manager", accessType: "Email", accessValue: "siti@umkmos.com", status: "Aktif" },
-  { id: 3, name: "Rian Hidayat", role: "Kasir", accessType: "PIN", accessValue: "••••12", status: "Aktif" },
-];
+const API = 'http://localhost:5000/api';
 
 export default function EmployeesPage() {
-  const [employees, setEmployees] = useState(initialEmployees);
+  const [employees, setEmployees] = useState<any[]>([]);
   const [search, setSearch] = useState("");
   const [isModalOpen, setIsModalOpen] = useState(false);
   
-  // Form State
+  // Form State Tambah
   const [newName, setNewName] = useState("");
   const [newRole, setNewRole] = useState("Kasir");
   const [newAccessValue, setNewAccessValue] = useState("");
+
+  // Form State Edit
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [editingEmployee, setEditingEmployee] = useState<any>(null);
+  const [editName, setEditName] = useState("");
+  const [editRole, setEditRole] = useState("Kasir");
+  const [editAccessValue, setEditAccessValue] = useState("");
+
+  const fetchEmployees = () => {
+    fetch(`${API}/employees`)
+      .then(res => res.json())
+      .then(data => setEmployees(data))
+      .catch(console.error);
+  };
+
+  useEffect(() => { fetchEmployees(); }, []);
 
   const filteredEmployees = employees.filter(emp => 
     emp.name.toLowerCase().includes(search.toLowerCase()) || 
     emp.role.toLowerCase().includes(search.toLowerCase())
   );
 
-  const handleAddEmployee = (e: React.FormEvent) => {
+  const handleAddEmployee = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newName || !newAccessValue) return;
 
-    const accessType = newRole === "Kasir" ? "PIN" : "Email";
-    
-    setEmployees([
-      ...employees, 
-      {
-        id: Date.now(),
-        name: newName,
-        role: newRole,
-        accessType: accessType,
-        accessValue: accessType === "PIN" ? `••••${newAccessValue.slice(-2)}` : newAccessValue,
-        status: "Aktif"
+    try {
+      const body: any = { name: newName, role: newRole };
+      if (newRole === 'Kasir') body.pin = newAccessValue;
+      else body.email = newAccessValue;
+
+      const res = await fetch(`${API}/employees`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+      const data = await res.json();
+      if (data.success) {
+        fetchEmployees();
+        setIsModalOpen(false);
+        setNewName(""); setNewRole("Kasir"); setNewAccessValue("");
       }
-    ]);
-    
-    setIsModalOpen(false);
-    setNewName("");
-    setNewRole("Kasir");
-    setNewAccessValue("");
+    } catch (err) { console.error(err); }
+  };
+
+  const handleEditEmployeeClick = (emp: any) => {
+    setEditingEmployee(emp);
+    setEditName(emp.name);
+    setEditRole(emp.role);
+    setEditAccessValue(""); // Biarkan kosong jika tidak mengubah PIN/Email
+    setIsEditModalOpen(true);
+  };
+
+  const handleEditEmployeeSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editName || !editingEmployee) return;
+
+    try {
+      const body: any = { name: editName, role: editRole };
+      if (editAccessValue) {
+        if (editRole === 'Kasir') body.pin = editAccessValue;
+        else body.email = editAccessValue;
+      }
+
+      const res = await fetch(`${API}/employees/${editingEmployee.id}`, {
+        method: 'PUT', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+      const data = await res.json();
+      if (data.success) {
+        fetchEmployees();
+        setIsEditModalOpen(false);
+      }
+    } catch (err) { console.error(err); }
+  };
+
+  const handleDeleteEmployee = async (id: string) => {
+    if (!confirm('Hapus karyawan ini?')) return;
+    try {
+      await fetch(`${API}/employees/${id}`, { method: 'DELETE' });
+      fetchEmployees();
+    } catch (err) { console.error(err); }
   };
 
   return (
@@ -134,10 +183,10 @@ export default function EmployeesPage() {
                   </td>
                   <td className="py-4 px-6 text-right">
                     <div className="flex justify-end gap-2">
-                      <button disabled={emp.role === 'Owner'} className="p-2 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors disabled:opacity-30 disabled:cursor-not-allowed">
+                      <button disabled={emp.role === 'Owner'} onClick={() => handleEditEmployeeClick(emp)} className="p-2 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors disabled:opacity-30 disabled:cursor-not-allowed">
                         <Edit3 className="w-4 h-4" />
                       </button>
-                      <button disabled={emp.role === 'Owner'} className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors disabled:opacity-30 disabled:cursor-not-allowed">
+                      <button disabled={emp.role === 'Owner'} onClick={() => handleDeleteEmployee(emp.id)} className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors disabled:opacity-30 disabled:cursor-not-allowed">
                         <Trash2 className="w-4 h-4" />
                       </button>
                     </div>
@@ -228,6 +277,80 @@ export default function EmployeesPage() {
                   >
                     <Plus className="w-5 h-5" />
                     Simpan Data
+                  </button>
+                </div>
+              </form>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* Modal Edit Karyawan */}
+      <AnimatePresence>
+        {isEditModalOpen && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <motion.div 
+              initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+              className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm"
+              onClick={() => setIsEditModalOpen(false)}
+            />
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.95, y: 20 }} 
+              animate={{ opacity: 1, scale: 1, y: 0 }} 
+              exit={{ opacity: 0, scale: 0.95, y: 20 }}
+              className="relative bg-white rounded-3xl shadow-2xl w-full max-w-md overflow-hidden"
+            >
+              <div className="px-6 py-4 border-b border-slate-100">
+                <h3 className="text-xl font-bold text-slate-900">Edit Karyawan</h3>
+              </div>
+              
+              <form onSubmit={handleEditEmployeeSubmit} className="p-6 space-y-5">
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1.5">Nama Lengkap</label>
+                  <input 
+                    required type="text" value={editName} onChange={e => setEditName(e.target.value)}
+                    placeholder="Contoh: Rian Hidayat"
+                    className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:bg-white outline-none transition-all"
+                  />
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1.5">Pilih Peran (Role)</label>
+                  <select 
+                    value={editRole} onChange={e => setEditRole(e.target.value)}
+                    className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:bg-white outline-none transition-all"
+                  >
+                    <option value="Kasir">Kasir (Akses via PIN)</option>
+                    <option value="Manager">Manajer (Akses via Email)</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1.5">
+                    {editRole === "Kasir" ? "PIN Baru (Opsional)" : "Email Baru (Opsional)"}
+                  </label>
+                  <input 
+                    type={editRole === "Kasir" ? "password" : "email"}
+                    value={editAccessValue} onChange={e => setEditAccessValue(e.target.value)}
+                    maxLength={editRole === "Kasir" ? 6 : undefined}
+                    placeholder="Kosongkan jika tidak ingin mengubah"
+                    className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:bg-white outline-none transition-all tracking-widest"
+                  />
+                </div>
+
+                <div className="pt-4 flex gap-3">
+                  <button 
+                    type="button" onClick={() => setIsEditModalOpen(false)}
+                    className="flex-1 py-3 px-4 bg-slate-100 text-slate-700 font-bold rounded-xl hover:bg-slate-200 transition-colors"
+                  >
+                    Batal
+                  </button>
+                  <button 
+                    type="submit"
+                    className="flex-1 py-3 px-4 bg-indigo-600 text-white font-bold rounded-xl hover:bg-indigo-700 shadow-md shadow-indigo-600/20 transition-colors flex items-center justify-center gap-2"
+                  >
+                    <Edit3 className="w-5 h-5" />
+                    Simpan Perubahan
                   </button>
                 </div>
               </form>

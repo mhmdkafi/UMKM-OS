@@ -1,0 +1,141 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model Business {
+  id                    String                 @id @default(uuid())
+  name                  String
+  address               String?
+  phone                 String?
+  created_at            DateTime               @default(now())
+  users                 User[]
+  categories            Category[]
+  ingredients           Ingredient[]
+  products              Product[]
+  transactions          Transaction[]
+  operational_expenses  OperationalExpense[]
+  ai_conversations      AiConversation[]
+}
+
+model User {
+  id            String    @id @default(uuid())
+  business_id   String
+  business      Business  @relation(fields: [business_id], references: [id])
+  name          String
+  email         String?   @unique
+  pin           String?
+  role          String    // OWNER, MANAGER, KASIR
+  created_at    DateTime  @default(now())
+}
+
+model Category {
+  id            String    @id @default(uuid())
+  business_id   String
+  business      Business  @relation(fields: [business_id], references: [id])
+  name          String
+  products      Product[]
+}
+
+model Ingredient {
+  id                  String               @id @default(uuid())
+  business_id         String
+  business            Business             @relation(fields: [business_id], references: [id])
+  name                String
+  unit                String
+  stock               Float
+  min_stock_alert     Float
+  product_recipes     ProductRecipe[]
+  inventory_movements InventoryMovement[]
+}
+
+model Product {
+  id            String          @id @default(uuid())
+  business_id   String
+  business      Business        @relation(fields: [business_id], references: [id])
+  category_id   String
+  category      Category        @relation(fields: [category_id], references: [id])
+  name          String
+  price         Float
+  image_url     String?
+  recipes       ProductRecipe[]
+  transaction_items TransactionItem[]
+}
+
+model ProductRecipe {
+  id            String      @id @default(uuid())
+  product_id    String
+  product       Product     @relation(fields: [product_id], references: [id])
+  ingredient_id String
+  ingredient    Ingredient  @relation(fields: [ingredient_id], references: [id])
+  quantity_used Float
+}
+
+model Transaction {
+  id              String            @id @default(uuid())
+  business_id     String
+  business        Business          @relation(fields: [business_id], references: [id])
+  cashier_id      String
+  customer_name   String?
+  total_amount    Float
+  payment_method  String            // TUNAI, QRIS
+  status          String            // COMPLETED, CANCELLED
+  created_at      DateTime          @default(now())
+  items           TransactionItem[]
+}
+
+model TransactionItem {
+  id              String      @id @default(uuid())
+  transaction_id  String
+  transaction     Transaction @relation(fields: [transaction_id], references: [id])
+  product_id      String
+  product         Product     @relation(fields: [product_id], references: [id])
+  quantity        Int
+  price_at_time   Float
+}
+
+model InventoryMovement {
+  id            String      @id @default(uuid())
+  ingredient_id String
+  ingredient    Ingredient  @relation(fields: [ingredient_id], references: [id])
+  type          String      // IN, OUT
+  quantity      Float
+  notes         String?
+  created_at    DateTime    @default(now())
+}
+
+model OperationalExpense {
+  id            String    @id @default(uuid())
+  business_id   String
+  business      Business  @relation(fields: [business_id], references: [id])
+  name          String
+  amount        Float
+  category      String
+  expense_date  DateTime
+  notes         String?
+  created_at    DateTime  @default(now())
+}
+
+model AiConversation {
+  id            String       @id @default(uuid())
+  business_id   String
+  business      Business     @relation(fields: [business_id], references: [id])
+  user_id       String
+  title         String
+  created_at    DateTime     @default(now())
+  messages      AiMessage[]
+}
+
+model AiMessage {
+  id                String          @id @default(uuid())
+  conversation_id   String
+  conversation      AiConversation  @relation(fields: [conversation_id], references: [id])
+  sender            String          // USER, AI
+  content           String
+  data_payload_json String?
+  created_at        DateTime        @default(now())
+}
