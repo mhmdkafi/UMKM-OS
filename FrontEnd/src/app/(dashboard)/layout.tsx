@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { 
@@ -15,14 +15,16 @@ import {
   X,
   TrendingUp,
   User,
-  Settings,
   Users,
   Wallet,
   MessageSquare,
   Send,
-  Minus
+  Minus,
+  BrainCircuit,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
+
+const API = 'http://localhost:5000/api';
 
 export default function DashboardLayout({
   children,
@@ -34,10 +36,14 @@ export default function DashboardLayout({
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [activeRole, setActiveRole] = useState<"owner" | "manager" | "kasir">("owner");
   const [userName, setUserName] = useState("");
+  const [businessId, setBusinessId] = useState("");
   const [isProfileDropdownOpen, setIsProfileDropdownOpen] = useState(false);
   const [businessCategory, setBusinessCategory] = useState("Lainnya");
   const [isAiPopupOpen, setIsAiPopupOpen] = useState(false);
-  const [aiMessage, setAiMessage] = useState("");
+  const [aiInput, setAiInput] = useState("");
+  const [isAiTyping, setIsAiTyping] = useState(false);
+  const [aiMessages, setAiMessages] = useState<{ sender: "user" | "ai"; text: string }[]>([]);
+  const chatEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const userStr = localStorage.getItem('user');
@@ -49,6 +55,7 @@ export default function DashboardLayout({
     try {
       const user = JSON.parse(userStr);
       setUserName(user.name || 'User');
+      setBusinessId(user.business_id || '');
       setBusinessCategory(user.business_category || 'Lainnya');
       const role = (user.role || 'OWNER').toLowerCase();
       if (role === 'owner') setActiveRole('owner');
@@ -57,7 +64,51 @@ export default function DashboardLayout({
     } catch { router.push('/login'); }
   }, [router]);
 
-  // Determine which navigation items to show based on the selected role (for demo purposes)
+  // Initialize AI popup with welcome message
+  useEffect(() => {
+    if (userName && aiMessages.length === 0) {
+      setAiMessages([{
+        sender: "ai",
+        text: `Halo ${userName}! Saya AI Assistant UMKM OS. Tanya apapun tentang data bisnis Anda, misalnya:\n"Berapa laba bersih saya?"`
+      }]);
+    }
+  }, [userName]);
+
+  useEffect(() => {
+    if (isAiPopupOpen) {
+      chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    }
+  }, [aiMessages, isAiTyping, isAiPopupOpen]);
+
+  const handleAiSend = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const question = aiInput.trim();
+    if (!question || isAiTyping) return;
+
+    setAiMessages(prev => [...prev, { sender: "user", text: question }]);
+    setAiInput("");
+    setIsAiTyping(true);
+
+    try {
+      const res = await fetch(`${API}/ai/query`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ question, business_id: businessId }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        const fullText = data.data.answer + (data.data.recommendation ? `\n\n💡 ${data.data.recommendation}` : '');
+        setAiMessages(prev => [...prev, { sender: "ai", text: fullText }]);
+      } else {
+        throw new Error('error');
+      }
+    } catch {
+      setAiMessages(prev => [...prev, { sender: "ai", text: "Maaf, gagal menghubungi server. Coba beberapa saat lagi." }]);
+    } finally {
+      setIsAiTyping(false);
+    }
+  };
+
   const getNavItems = () => {
     let inventoryName = "Inventaris & Stok";
     let productsName = "Daftar Produk";
@@ -84,13 +135,12 @@ export default function DashboardLayout({
       { name: "Pengeluaran", href: "/expenses", icon: Wallet, roles: ["owner", "manager"] },
       { name: "Laporan Keuangan", href: "/reports", icon: PieChart, roles: ["owner"] },
       { name: "Manajemen Karyawan", href: "/employees", icon: Users, roles: ["owner"] },
+      { name: "AI Assistant", href: "/ai", icon: Sparkles, roles: ["owner"] },
     ];
     return allItems.filter(item => item.roles.includes(activeRole));
   };
 
   const navItems = getNavItems();
-  
-  // Kasir POS usually needs full width, so we might want to collapse sidebar automatically
   const isPosRoute = pathname === "/pos";
 
   return (
@@ -131,18 +181,25 @@ export default function DashboardLayout({
             <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Menu Utama</p>
             {navItems.map((item) => {
               const isActive = pathname === item.href;
+              const isAI = item.href === "/ai";
               return (
                 <Link
                   key={item.name}
                   href={item.href}
+                  onClick={() => setSidebarOpen(false)}
                   className={`flex items-center gap-3 px-3 py-2.5 rounded-lg font-medium transition-colors mb-1 ${
                     isActive 
-                      ? "bg-indigo-50 text-indigo-700" 
-                      : "text-slate-600 hover:bg-slate-50 hover:text-slate-900"
+                      ? isAI ? "bg-indigo-600 text-white" : "bg-indigo-50 text-indigo-700" 
+                      : isAI
+                        ? "text-indigo-600 bg-indigo-50/50 hover:bg-indigo-50 hover:text-indigo-700"
+                        : "text-slate-600 hover:bg-slate-50 hover:text-slate-900"
                   }`}
                 >
-                  <item.icon className={`w-5 h-5 ${isActive ? "text-indigo-600" : "text-slate-400"}`} />
+                  <item.icon className={`w-5 h-5 ${isActive ? (isAI ? "text-white" : "text-indigo-600") : isAI ? "text-indigo-500" : "text-slate-400"}`} />
                   {item.name}
+                  {isAI && !isActive && (
+                    <span className="ml-auto text-xs bg-indigo-100 text-indigo-600 px-1.5 py-0.5 rounded-full font-semibold">AI</span>
+                  )}
                 </Link>
               );
             })}
@@ -177,7 +234,6 @@ export default function DashboardLayout({
           </div>
 
           <div className="flex items-center gap-4">
-
             <div className="relative">
               <button 
                 onClick={() => setIsProfileDropdownOpen(!isProfileDropdownOpen)}
@@ -234,7 +290,7 @@ export default function DashboardLayout({
         </main>
       </div>
 
-      {/* Floating AI Assistant Widget */}
+      {/* Floating AI Assistant Widget — only for owner */}
       {activeRole === "owner" && (
         <div className="fixed bottom-6 right-6 z-50 flex flex-col items-end">
           <AnimatePresence>
@@ -244,7 +300,7 @@ export default function DashboardLayout({
                 animate={{ opacity: 1, y: 0, scale: 1 }}
                 exit={{ opacity: 0, y: 20, scale: 0.95 }}
                 className="bg-white rounded-2xl shadow-2xl border border-indigo-100 w-80 sm:w-96 mb-4 overflow-hidden flex flex-col"
-                style={{ height: '450px' }}
+                style={{ height: '480px' }}
               >
                 {/* Header AI */}
                 <div className="bg-indigo-600 p-4 flex justify-between items-center text-white rounded-t-2xl">
@@ -252,41 +308,76 @@ export default function DashboardLayout({
                     <Sparkles className="w-5 h-5 text-indigo-200" />
                     <div>
                       <h3 className="font-bold text-sm">AI Business Assistant</h3>
-                      <p className="text-xs text-indigo-200">Online & siap membantu</p>
+                      <p className="text-xs text-indigo-200">Berbasis data bisnis Anda</p>
                     </div>
                   </div>
-                  <button onClick={() => setIsAiPopupOpen(false)} className="text-indigo-200 hover:text-white p-1 rounded-md transition-colors">
-                    <Minus className="w-5 h-5" />
-                  </button>
+                  <div className="flex items-center gap-2">
+                    <Link 
+                      href="/ai" 
+                      className="text-indigo-200 hover:text-white text-xs underline"
+                      onClick={() => setIsAiPopupOpen(false)}
+                    >
+                      Buka Penuh
+                    </Link>
+                    <button onClick={() => setIsAiPopupOpen(false)} className="text-indigo-200 hover:text-white p-1 rounded-md transition-colors">
+                      <Minus className="w-5 h-5" />
+                    </button>
+                  </div>
                 </div>
 
                 {/* Chat Area */}
                 <div className="flex-1 p-4 bg-slate-50/50 overflow-y-auto flex flex-col gap-3">
-                  <div className="self-start max-w-[85%] bg-white border border-slate-100 p-3 rounded-2xl rounded-tl-sm text-sm text-slate-700 shadow-sm">
-                    Halo {userName}! Saya AI Assistant dari UMKM OS. Ada yang bisa saya bantu hari ini? 
-                    Misalnya, Anda bisa bertanya "Berapa laba bersih minggu ini?"
-                  </div>
-                  {/* Fake user message example */}
-                  <div className="self-end max-w-[85%] bg-indigo-600 p-3 rounded-2xl rounded-tr-sm text-sm text-white shadow-sm">
-                    Berapa laba bersih minggu ini?
-                  </div>
-                  {/* Fake AI response example */}
-                  <div className="self-start max-w-[85%] bg-white border border-slate-100 p-3 rounded-2xl rounded-tl-sm text-sm text-slate-700 shadow-sm">
-                    Laba bersih minggu ini adalah <strong>Rp 4.500.000</strong> (naik 12% dari minggu lalu). Pengeluaran terbesar Anda adalah untuk biaya operasional marketing.
-                  </div>
+                  {aiMessages.map((msg, i) => (
+                    <div 
+                      key={i} 
+                      className={`flex gap-2 ${msg.sender === 'user' ? 'flex-row-reverse' : ''}`}
+                    >
+                      <div className={`w-6 h-6 rounded-full flex-shrink-0 flex items-center justify-center mt-1 ${msg.sender === 'user' ? 'bg-slate-300' : 'bg-indigo-600'}`}>
+                        {msg.sender === 'user' 
+                          ? <User className="w-3 h-3 text-slate-600" />
+                          : <BrainCircuit className="w-3 h-3 text-white" />
+                        }
+                      </div>
+                      <div className={`max-w-[80%] p-3 rounded-2xl text-sm shadow-sm whitespace-pre-wrap ${
+                        msg.sender === 'user'
+                          ? 'bg-indigo-600 text-white rounded-tr-sm'
+                          : 'bg-white border border-slate-100 text-slate-700 rounded-tl-sm'
+                      }`}>
+                        {msg.text}
+                      </div>
+                    </div>
+                  ))}
+
+                  {isAiTyping && (
+                    <div className="flex gap-2">
+                      <div className="w-6 h-6 rounded-full bg-indigo-600 flex-shrink-0 flex items-center justify-center">
+                        <Sparkles className="w-3 h-3 text-white animate-pulse" />
+                      </div>
+                      <div className="bg-white border border-slate-100 p-3 rounded-2xl rounded-tl-sm flex gap-1">
+                        <span className="w-1.5 h-1.5 rounded-full bg-slate-300 animate-bounce"></span>
+                        <span className="w-1.5 h-1.5 rounded-full bg-slate-300 animate-bounce" style={{ animationDelay: '0.2s' }}></span>
+                        <span className="w-1.5 h-1.5 rounded-full bg-slate-300 animate-bounce" style={{ animationDelay: '0.4s' }}></span>
+                      </div>
+                    </div>
+                  )}
+                  <div ref={chatEndRef} />
                 </div>
 
                 {/* Input Area */}
                 <div className="p-3 bg-white border-t border-slate-100">
-                  <form onSubmit={(e) => { e.preventDefault(); setAiMessage(''); }} className="flex gap-2">
+                  <form onSubmit={handleAiSend} className="flex gap-2">
                     <input 
                       type="text" 
-                      value={aiMessage}
-                      onChange={(e) => setAiMessage(e.target.value)}
-                      placeholder="Ketik pesan Anda..." 
+                      value={aiInput}
+                      onChange={(e) => setAiInput(e.target.value)}
+                      placeholder="Tanya data bisnis Anda..." 
                       className="flex-1 bg-slate-50 border border-slate-200 rounded-full px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-all"
                     />
-                    <button type="submit" disabled={!aiMessage.trim()} className="bg-indigo-600 text-white p-2.5 rounded-full hover:bg-indigo-700 disabled:opacity-50 disabled:hover:bg-indigo-600 transition-colors">
+                    <button 
+                      type="submit" 
+                      disabled={!aiInput.trim() || isAiTyping} 
+                      className="bg-indigo-600 text-white p-2.5 rounded-full hover:bg-indigo-700 disabled:opacity-50 disabled:hover:bg-indigo-600 transition-colors"
+                    >
                       <Send className="w-4 h-4" />
                     </button>
                   </form>

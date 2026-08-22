@@ -21,7 +21,9 @@ export default function InventoryPage() {
   const [newUnit, setNewUnit] = useState("Gram");
   const [newStock, setNewStock] = useState("");
   const [newMinStock, setNewMinStock] = useState("");
+  const [newCostPerUnit, setNewCostPerUnit] = useState("");
   const [businessCategory, setBusinessCategory] = useState("Lainnya");
+  const [adjustCostPerUnit, setAdjustCostPerUnit] = useState("");
 
   const getBusinessId = () => {
     if (typeof window !== 'undefined') {
@@ -114,11 +116,13 @@ export default function InventoryPage() {
           type: adjustType,
           amount: parseFloat(adjustAmount),
           notes: adjustNotes || `${adjustType === 'in' ? 'Stock In' : 'Stock Out'} manual`,
+          cost_per_unit: adjustType === 'in' ? (adjustCostPerUnit || selectedItem.cost_per_unit || 0) : undefined,
         }),
       });
       setShowAdjustModal(false);
       setAdjustAmount("");
       setAdjustNotes("");
+      setAdjustCostPerUnit("");
       fetchInventory();
     } catch (err) { console.error(err); }
   };
@@ -137,10 +141,11 @@ export default function InventoryPage() {
           unit: newUnit,
           stock: newStock,
           min_stock_alert: newMinStock || "0",
+          cost_per_unit: newCostPerUnit || "0",
         }),
       });
       setShowAddModal(false);
-      setNewName(""); setNewUnit("Gram"); setNewStock(""); setNewMinStock("");
+      setNewName(""); setNewUnit("Gram"); setNewStock(""); setNewMinStock(""); setNewCostPerUnit("");
       fetchInventory();
     } catch (err) { console.error(err); }
   };
@@ -297,6 +302,15 @@ export default function InventoryPage() {
                   <label className="block text-sm font-medium text-slate-700 mb-1">Jumlah ({selectedItem.unit})</label>
                   <input type="number" value={adjustAmount} onChange={e => setAdjustAmount(e.target.value)} required className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none text-slate-900" placeholder="Contoh: 500" />
                 </div>
+                {adjustType === 'in' && (
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-1">Harga Beli per Unit (Rp) <span className="text-slate-400 font-normal">— untuk hitung WAC</span></label>
+                    <div className="relative">
+                      <span className="absolute inset-y-0 left-0 pl-3 flex items-center text-slate-500 font-bold text-sm">Rp</span>
+                      <input type="number" value={adjustCostPerUnit} onChange={e => setAdjustCostPerUnit(e.target.value)} className="w-full pl-10 border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none text-slate-900" placeholder={`Saat ini: Rp ${selectedItem.cost_per_unit || 0}`} />
+                    </div>
+                  </div>
+                )}
                 <div>
                   <label className="block text-sm font-medium text-slate-700 mb-1">Catatan</label>
                   <input type="text" value={adjustNotes} onChange={e => setAdjustNotes(e.target.value)} className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none text-slate-900" placeholder="Beli dari supplier, dll" />
@@ -339,6 +353,14 @@ export default function InventoryPage() {
                     <label className="block text-sm font-medium text-slate-700 mb-1">Batas Minimum</label>
                     <input type="number" value={newMinStock} onChange={e => setNewMinStock(e.target.value)} className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none text-slate-900" />
                   </div>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">Harga Beli per Unit (Rp) <span className="text-slate-400 font-normal">— untuk kalkulasi COGS/HPP</span></label>
+                  <div className="relative">
+                    <span className="absolute inset-y-0 left-0 pl-3 flex items-center text-slate-500 font-bold text-sm">Rp</span>
+                    <input type="number" value={newCostPerUnit} onChange={e => setNewCostPerUnit(e.target.value)} className="w-full pl-10 border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none text-slate-900" placeholder="Contoh: 18000" />
+                  </div>
+                  <p className="text-xs text-slate-400 mt-1">WAC akan otomatis diperbarui setiap kali Anda melakukan Stock In dengan harga berbeda.</p>
                 </div>
                 <button type="submit" className="w-full bg-indigo-600 text-white py-2.5 rounded-lg font-medium hover:bg-indigo-700 transition-colors">Simpan</button>
               </form>

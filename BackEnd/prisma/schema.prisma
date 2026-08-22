@@ -49,6 +49,7 @@ model Ingredient {
   unit                String
   stock               Float
   min_stock_alert     Float
+  cost_per_unit       Float                @default(0)
   product_recipes     ProductRecipe[]
   inventory_movements InventoryMovement[]
 }

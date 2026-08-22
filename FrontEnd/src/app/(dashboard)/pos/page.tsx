@@ -7,18 +7,26 @@ import { motion, AnimatePresence } from "framer-motion";
 export default function PosInterface() {
   const [products, setProducts] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [currentUser, setCurrentUser] = useState<any>(null);
 
   useEffect(() => {
-    fetch('http://localhost:5000/api/products')
-      .then(res => res.json())
-      .then(data => {
-        setProducts(data);
-        setIsLoading(false);
-      })
-      .catch(err => {
-        console.error("Failed to load products:", err);
-        setIsLoading(false);
-      });
+    const userStr = localStorage.getItem('user');
+    if (userStr) {
+      const user = JSON.parse(userStr);
+      setCurrentUser(user);
+      fetch(`http://localhost:5000/api/products?business_id=${user.business_id}`)
+        .then(res => res.json())
+        .then(data => {
+          setProducts(Array.isArray(data) ? data : []);
+          setIsLoading(false);
+        })
+        .catch(err => {
+          console.error("Failed to load products:", err);
+          setIsLoading(false);
+        });
+    } else {
+      setIsLoading(false);
+    }
   }, []);
   const [cart, setCart] = useState<any[]>([]);
   const [search, setSearch] = useState("");
@@ -71,14 +79,17 @@ export default function PosInterface() {
     e.preventDefault();
     if (!customerName) return;
     
+    const businessId = currentUser?.business_id;
+    const cashierId = currentUser?.id || 'system';
+
     // POST to backend API
     try {
       const response = await fetch('http://localhost:5000/api/pos/checkout', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          business_id: products[0]?.business_id || "fallback-id", // usually from auth context
-          cashier_id: "cashier-1",
+          business_id: businessId,
+          cashier_id: cashierId,
           customer_name: customerName,
           total_amount: total,
           payment_method: paymentModalType?.toUpperCase(),
@@ -88,7 +99,6 @@ export default function PosInterface() {
       
       const data = await response.json();
       if (data.success) {
-        // Use generated transaction ID for queue number if possible, or random
         setQueueNumber(`A-${data.transaction.id.slice(0,4).toUpperCase()}`);
         setPaymentModalType(null);
         setShowReceipt(true);

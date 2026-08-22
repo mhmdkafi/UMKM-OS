@@ -20,6 +20,7 @@ import expensesRoutes from './routes/expenses';
 import employeesRoutes from './routes/employees';
 import categoriesRoutes from './routes/categories';
 import dashboardRoutes from './routes/dashboard';
+import aiRoutes from './routes/ai';
 
 app.use('/api/auth', authRoutes);
 app.use('/api/products', productRoutes);
@@ -29,6 +30,7 @@ app.use('/api/expenses', expensesRoutes);
 app.use('/api/employees', employeesRoutes);
 app.use('/api/categories', categoriesRoutes);
 app.use('/api/dashboard', dashboardRoutes);
+app.use('/api/ai', aiRoutes);
 
 // Health check
 app.get('/api/health', (req, res) => {

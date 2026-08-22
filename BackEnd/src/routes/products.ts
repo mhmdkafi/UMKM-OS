@@ -37,6 +37,9 @@ router.get('/', async (req: Request, res: Response) => {
         calculatedStock = (p as any).stock || 0;
       }
 
+      const totalCogs = p.recipes.reduce((sum, r) => sum + (r.quantity_used * ((r.ingredient as any).cost_per_unit || 0)), 0);
+      const margin = p.price > 0 ? Math.round((1 - totalCogs / p.price) * 100) : 0;
+
       return {
         id: p.id,
         business_id: p.business_id,
@@ -46,14 +49,15 @@ router.get('/', async (req: Request, res: Response) => {
         category_id: p.category_id,
         image: p.image_url,
         stock: calculatedStock,
-        cogs: p.recipes.reduce((sum, r) => sum + (r.quantity_used * 500), 0), // estimate
-        margin: p.price > 0 ? Math.round((1 - p.recipes.reduce((sum, r) => sum + (r.quantity_used * 500), 0) / p.price) * 100) : 0,
+        cogs: totalCogs,
+        margin,
         recipe: p.recipes.map(r => ({
           id: r.id,
           item: r.ingredient.name,
           qty: String(r.quantity_used),
           unit: r.ingredient.unit,
           ingredient_id: r.ingredient_id,
+          cost_per_unit: (r.ingredient as any).cost_per_unit || 0,
         })),
       };
     });
