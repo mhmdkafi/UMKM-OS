@@ -21,15 +21,78 @@ export default function InventoryPage() {
   const [newUnit, setNewUnit] = useState("Gram");
   const [newStock, setNewStock] = useState("");
   const [newMinStock, setNewMinStock] = useState("");
+  const [businessCategory, setBusinessCategory] = useState("Lainnya");
+
+  const getBusinessId = () => {
+    if (typeof window !== 'undefined') {
+      const user = JSON.parse(localStorage.getItem('user') || '{}');
+      return user.business_id;
+    }
+    return '';
+  };
 
   const fetchInventory = () => {
-    fetch(`${API}/inventory`)
+    const bid = getBusinessId();
+    if (!bid) return;
+    fetch(`${API}/inventory?business_id=${bid}`)
       .then(res => res.json())
       .then(data => setInventory(data))
       .catch(console.error);
   };
 
-  useEffect(() => { fetchInventory(); }, []);
+  useEffect(() => {
+    fetchInventory();
+    const userStr = localStorage.getItem('user');
+    if (userStr) {
+      try {
+        const user = JSON.parse(userStr);
+        const cat = user.business_category || 'Lainnya';
+        setBusinessCategory(cat);
+        if (cat === "fnb" || cat === "Food & Beverage (Kuliner)") {
+          setNewUnit("Gram");
+        } else {
+          setNewUnit("Pcs");
+        }
+      } catch (e) {}
+    }
+  }, []);
+
+  let itemLabel = "Item";
+  let itemLabelLower = "item";
+  let itemExample = "Barang A";
+  let pageTitle = "Inventaris & Stok";
+  let pageSubtitle = "Pantau pergerakan stok dan ketersediaan barang.";
+  let availableUnits = ["Pcs", "Box", "Kg", "Liter", "Unit"];
+
+  if (businessCategory === "fnb" || businessCategory === "Food & Beverage (Kuliner)") {
+     itemLabel = "Bahan Baku";
+     itemLabelLower = "bahan baku";
+     itemExample = "Susu Almond";
+     pageTitle = "Inventaris Bahan Baku";
+     pageSubtitle = "Pantau pergerakan stok dan ketersediaan bahan baku.";
+     availableUnits = ["Gram", "Kg", "ml", "Liter", "Pcs", "Dus", "Pak"];
+  } else if (businessCategory === "retail" || businessCategory === "Retail / Toko Kelontong") {
+     itemLabel = "Barang";
+     itemLabelLower = "barang";
+     itemExample = "Sabun Cuci";
+     pageTitle = "Stok Gudang";
+     pageSubtitle = "Pantau pergerakan stok dan ketersediaan barang jualan.";
+     availableUnits = ["Pcs", "Dus", "Pak", "Karton", "Botol", "Renteng", "Kg", "Gram"];
+  } else if (businessCategory === "fashion" || businessCategory === "Fashion & Pakaian") {
+     itemLabel = "Pakaian";
+     itemLabelLower = "pakaian / kain";
+     itemExample = "Kemeja Flanel";
+     pageTitle = "Stok Barang / Kain";
+     pageSubtitle = "Pantau pergerakan stok dan ketersediaan pakaian dan kain.";
+     availableUnits = ["Pcs", "Lusin", "Kodi", "Meter", "Gulung"];
+  } else if (businessCategory === "services" || businessCategory === "Jasa / Salon / Bengkel") {
+     itemLabel = "Perlengkapan";
+     itemLabelLower = "perlengkapan";
+     itemExample = "Oli Mesin";
+     pageTitle = "Perlengkapan & Suku Cadang";
+     pageSubtitle = "Pantau pergerakan stok perlengkapan dan suku cadang.";
+     availableUnits = ["Pcs", "Set", "Botol", "Liter", "Tube"];
+  }
 
   const filteredInventory = inventory.filter(item => 
     item.name.toLowerCase().includes(search.toLowerCase()) || 
@@ -64,7 +127,7 @@ export default function InventoryPage() {
     e.preventDefault();
     if (!newName || !newStock) return;
     try {
-      const biz = inventory[0]?.business_id;
+      const biz = getBusinessId();
       await fetch(`${API}/inventory`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -83,7 +146,7 @@ export default function InventoryPage() {
   };
 
   const handleDelete = async (id: string) => {
-    if (!confirm('Hapus bahan baku ini?')) return;
+    if (!confirm(`Hapus ${itemLabelLower} ini?`)) return;
     try {
       await fetch(`${API}/inventory/${id}`, { method: 'DELETE' });
       fetchInventory();
@@ -94,13 +157,13 @@ export default function InventoryPage() {
     <div className="space-y-6 max-w-7xl mx-auto">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
-          <h2 className="text-2xl font-bold text-slate-900">Manajemen Inventaris</h2>
-          <p className="text-slate-500">Pantau pergerakan stok dan ketersediaan bahan baku.</p>
+          <h2 className="text-2xl font-bold text-slate-900">{pageTitle}</h2>
+          <p className="text-slate-500">{pageSubtitle}</p>
         </div>
         <div className="flex gap-2">
           <button onClick={() => setShowAddModal(true)} className="flex items-center gap-2 bg-white border border-slate-200 text-slate-700 px-4 py-2 rounded-lg font-medium hover:bg-slate-50 transition-colors shadow-sm">
             <Plus className="w-4 h-4" />
-            Tambah Bahan
+            Tambah {itemLabel}
           </button>
         </div>
       </div>
@@ -145,7 +208,7 @@ export default function InventoryPage() {
             </div>
             <input 
               type="text" 
-              placeholder="Cari bahan baku..." 
+              placeholder={`Cari ${itemLabelLower}...`} 
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               className="block w-full pl-9 pr-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 text-slate-900"
@@ -157,7 +220,7 @@ export default function InventoryPage() {
           <table className="w-full text-left border-collapse">
             <thead>
               <tr className="bg-white border-b border-slate-200 text-sm text-slate-500">
-                <th className="py-4 px-6 font-medium">Nama Barang</th>
+                <th className="py-4 px-6 font-medium">Nama {itemLabel}</th>
                 <th className="py-4 px-6 font-medium">Stok Tersedia</th>
                 <th className="py-4 px-6 font-medium">Batas Minimum</th>
                 <th className="py-4 px-6 font-medium">Status</th>
@@ -251,18 +314,20 @@ export default function InventoryPage() {
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
             <motion.div initial={{ scale: 0.95 }} animate={{ scale: 1 }} exit={{ scale: 0.95 }} className="bg-white rounded-2xl w-full max-w-md p-6 shadow-2xl">
               <div className="flex justify-between items-center mb-6">
-                <h3 className="text-lg font-bold text-slate-900">Tambah Bahan Baku</h3>
+                <h3 className="text-lg font-bold text-slate-900">Tambah {itemLabel}</h3>
                 <button onClick={() => setShowAddModal(false)} className="text-slate-400 hover:text-slate-600"><X className="w-5 h-5" /></button>
               </div>
               <form onSubmit={handleAdd} className="space-y-4">
                 <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1">Nama Bahan</label>
-                  <input type="text" value={newName} onChange={e => setNewName(e.target.value)} required className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none text-slate-900" placeholder="Contoh: Susu Almond" />
+                  <label className="block text-sm font-medium text-slate-700 mb-1">Nama {itemLabel}</label>
+                  <input type="text" value={newName} onChange={e => setNewName(e.target.value)} required className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none text-slate-900" placeholder={`Contoh: ${itemExample}`} />
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-slate-700 mb-1">Satuan</label>
                   <select value={newUnit} onChange={e => setNewUnit(e.target.value)} className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none text-slate-900">
-                    <option>Gram</option><option>Kg</option><option>ml</option><option>Liter</option><option>Pcs</option>
+                    {availableUnits.map(unit => (
+                      <option key={unit} value={unit}>{unit}</option>
+                    ))}
                   </select>
                 </div>
                 <div className="grid grid-cols-2 gap-3">

@@ -6,7 +6,11 @@ const router = Router();
 // ==================== GET ALL ====================
 router.get('/', async (req: Request, res: Response) => {
   try {
+    const { business_id } = req.query;
+    const whereClause = business_id ? { business_id: String(business_id) } : {};
+
     const expenses = await prisma.operationalExpense.findMany({
+      where: whereClause,
       orderBy: { expense_date: 'desc' }
     });
     const formatted = expenses.map(exp => ({

@@ -9,8 +9,11 @@ const API = 'http://localhost:5000/api';
 export default function ProductsPage() {
   const [products, setProducts] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [businessCategory, setBusinessCategory] = useState("Lainnya");
 
   const [categories, setCategories] = useState<any[]>([]);
+  const [isAddingCategory, setIsAddingCategory] = useState(false);
+  const [newCategoryName, setNewCategoryName] = useState("");
   const [inventory, setInventory] = useState<any[]>([]);
   const [showAddProductModal, setShowAddProductModal] = useState(false);
   const [newProductName, setNewProductName] = useState("");
@@ -30,8 +33,18 @@ export default function ProductsPage() {
   const [editProductImage, setEditProductImage] = useState("");
   const [editProductRecipes, setEditProductRecipes] = useState<{ingredient_id: string, qty: string}[]>([]);
 
+  const getBusinessId = () => {
+    if (typeof window !== 'undefined') {
+      const user = JSON.parse(localStorage.getItem('user') || '{}');
+      return user.business_id;
+    }
+    return '';
+  };
+
   const fetchProducts = () => {
-    fetch(`${API}/products`)
+    const bid = getBusinessId();
+    if (!bid) return;
+    fetch(`${API}/products?business_id=${bid}`)
       .then(res => res.json())
       .then(data => {
         setProducts(data);
@@ -41,14 +54,18 @@ export default function ProductsPage() {
   };
 
   const fetchCategories = () => {
-    fetch(`${API}/categories`).then(res => res.json()).then(data => {
+    const bid = getBusinessId();
+    if (!bid) return;
+    fetch(`${API}/categories?business_id=${bid}`).then(res => res.json()).then(data => {
       setCategories(data);
       if(data.length > 0) setNewProductCategory(data[0].id);
     }).catch(console.error);
   };
 
   const fetchInventory = () => {
-    fetch(`${API}/inventory`).then(res => res.json()).then(data => {
+    const bid = getBusinessId();
+    if (!bid) return;
+    fetch(`${API}/inventory?business_id=${bid}`).then(res => res.json()).then(data => {
       setInventory(data);
       if(data.length > 0) setRecipeIngredientId(data[0].id);
     }).catch(console.error);
@@ -58,13 +75,42 @@ export default function ProductsPage() {
     fetchProducts(); 
     fetchCategories();
     fetchInventory();
+    const userStr = localStorage.getItem('user');
+    if (userStr) {
+      try {
+        setBusinessCategory(JSON.parse(userStr).business_category || 'Lainnya');
+      } catch (e) {}
+    }
   }, []);
+
+  const handleSaveCategory = async () => {
+    if (!newCategoryName) return;
+    try {
+      const bid = getBusinessId();
+      const res = await fetch(`${API}/categories`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ business_id: bid, name: newCategoryName }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        setCategories([...categories, data.category]);
+        setNewProductCategory(data.category.id);
+        setEditProductCategory(data.category.id);
+        setIsAddingCategory(false);
+        setNewCategoryName("");
+      }
+    } catch (err) { console.error(err); }
+  };
 
   const handleAddProduct = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newProductName || !newProductPrice) return;
+    if (!newProductName || !newProductPrice || !newProductCategory) {
+      alert("Pastikan nama, harga, dan kategori sudah terisi. Jika kategori kosong, silakan buat kategori baru terlebih dahulu.");
+      return;
+    }
     try {
-      const biz = products.length > 0 ? products[0].business_id : null;
+      const biz = getBusinessId();
       await fetch(`${API}/products`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -177,12 +223,44 @@ export default function ProductsPage() {
     p.category.toLowerCase().includes(search.toLowerCase())
   );
 
+  let pageTitle = "Daftar Produk";
+  let pageSubtitle = "Kelola daftar produk dan komponen pemotong stok.";
+  let productExample = "Produk A";
+  let recipeTitle = "Komponen Produk";
+  let ingredientLabel = "Komponen";
+
+  if (businessCategory === "fnb" || businessCategory === "Food & Beverage (Kuliner)") {
+     pageTitle = "Menu & Resep (BOM)";
+     pageSubtitle = "Kelola daftar menu dan resep bahan baku pemotong stok.";
+     productExample = "Kopi Susu Aren";
+     recipeTitle = "Komposisi Bahan Baku (Resep)";
+     ingredientLabel = "Bahan Baku";
+  } else if (businessCategory === "retail" || businessCategory === "Retail / Toko Kelontong") {
+     pageTitle = "Etalase Produk";
+     pageSubtitle = "Kelola daftar barang jualan dan stok gabungan.";
+     productExample = "Sabun Cuci 1 Dus";
+     recipeTitle = "Rincian Stok Barang";
+     ingredientLabel = "Barang";
+  } else if (businessCategory === "fashion" || businessCategory === "Fashion & Pakaian") {
+     pageTitle = "Katalog Pakaian";
+     pageSubtitle = "Kelola daftar pakaian siap jual dan pemakaian material.";
+     productExample = "Kemeja Flanel";
+     recipeTitle = "Pemakaian Material";
+     ingredientLabel = "Material/Kain";
+  } else if (businessCategory === "services" || businessCategory === "Jasa / Salon / Bengkel") {
+     pageTitle = "Layanan & Jasa";
+     pageSubtitle = "Kelola daftar layanan dan pemakaian perlengkapan/suku cadang.";
+     productExample = "Ganti Oli Mesin";
+     recipeTitle = "Pemakaian Suku Cadang";
+     ingredientLabel = "Suku Cadang";
+  }
+
   return (
     <div className="space-y-6 max-w-7xl mx-auto flex flex-col h-[calc(100vh-6rem)]">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 flex-shrink-0">
         <div>
-          <h2 className="text-2xl font-bold text-slate-900">Produk & Resep (BOM)</h2>
-          <p className="text-slate-500">Kelola daftar menu dan resep bahan baku pemotong stok.</p>
+          <h2 className="text-2xl font-bold text-slate-900">{pageTitle}</h2>
+          <p className="text-slate-500">{pageSubtitle}</p>
         </div>
         <button onClick={() => setShowAddProductModal(true)} className="flex items-center gap-2 bg-indigo-600 text-white px-4 py-2 rounded-lg font-medium hover:bg-indigo-700 transition-colors shadow-sm">
           <Plus className="w-4 h-4" />
@@ -259,7 +337,7 @@ export default function ProductsPage() {
                   <div>
                     <h3 className="text-xl font-bold text-slate-900 mb-1">{selectedProduct.name}</h3>
                     <p className="text-sm text-slate-500 flex items-center gap-1">
-                      <BookOpen className="w-4 h-4" /> Resep / Bill of Materials
+                      <BookOpen className="w-4 h-4" /> {recipeTitle}
                     </p>
                   </div>
                   <div className="flex gap-2">
@@ -288,9 +366,9 @@ export default function ProductsPage() {
                   {/* Recipe List */}
                   <div>
                     <div className="flex justify-between items-center mb-4">
-                      <h4 className="font-semibold text-slate-800">Komposisi Bahan Baku</h4>
+                      <h4 className="font-semibold text-slate-800">{recipeTitle}</h4>
                       <button onClick={() => setShowAddRecipeModal(true)} className="text-xs font-medium text-indigo-600 hover:text-indigo-700 flex items-center gap-1">
-                        <Plus className="w-3 h-3" /> Tambah Bahan
+                        <Plus className="w-3 h-3" /> Tambah {ingredientLabel}
                       </button>
                     </div>
                     
@@ -298,7 +376,7 @@ export default function ProductsPage() {
                       <table className="w-full text-sm text-left">
                         <thead className="bg-slate-50 text-slate-500 border-b border-slate-200">
                           <tr>
-                            <th className="px-4 py-2 font-medium">Bahan</th>
+                            <th className="px-4 py-2 font-medium">{ingredientLabel}</th>
                             <th className="px-4 py-2 font-medium text-right">Takaran</th>
                           </tr>
                         </thead>
@@ -342,13 +420,34 @@ export default function ProductsPage() {
               <form onSubmit={handleAddProduct} className="space-y-4 max-h-[75vh] overflow-y-auto px-1">
                 <div>
                   <label className="block text-sm font-medium text-slate-700 mb-1">Nama Produk</label>
-                  <input type="text" value={newProductName} onChange={e => setNewProductName(e.target.value)} required className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none text-slate-900" placeholder="Contoh: Kopi Susu Aren" />
+                  <input type="text" value={newProductName} onChange={e => setNewProductName(e.target.value)} required className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none text-slate-900" placeholder={`Contoh: ${productExample}`} />
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-slate-700 mb-1">Kategori</label>
-                  <select value={newProductCategory} onChange={e => setNewProductCategory(e.target.value)} className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none text-slate-900">
-                    {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-                  </select>
+                  {isAddingCategory ? (
+                    <div className="flex gap-2">
+                      <input 
+                        type="text" 
+                        value={newCategoryName} 
+                        onChange={e => setNewCategoryName(e.target.value)} 
+                        className="flex-1 border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none text-slate-900" 
+                        placeholder="Nama kategori..." 
+                        autoFocus
+                      />
+                      <button type="button" onClick={handleSaveCategory} className="bg-indigo-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-indigo-700">Simpan</button>
+                      <button type="button" onClick={() => setIsAddingCategory(false)} className="bg-slate-100 text-slate-600 px-3 py-2 rounded-lg text-sm hover:bg-slate-200">Batal</button>
+                    </div>
+                  ) : (
+                    <div className="flex gap-2">
+                      <select value={newProductCategory} onChange={e => setNewProductCategory(e.target.value)} className="flex-1 border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none text-slate-900">
+                        {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                        {categories.length === 0 && <option value="" disabled>Belum ada kategori</option>}
+                      </select>
+                      <button type="button" onClick={() => setIsAddingCategory(true)} className="flex items-center gap-1 bg-slate-100 text-indigo-600 px-3 py-2 rounded-lg text-sm font-medium hover:bg-slate-200 whitespace-nowrap">
+                        <Plus className="w-3.5 h-3.5" /> Kategori
+                      </button>
+                    </div>
+                  )}
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-slate-700 mb-1">Harga Jual (Rp)</label>
@@ -382,9 +481,9 @@ export default function ProductsPage() {
                 {/* Komposisi Bahan Baku */}
                 <div className="pt-2 border-t border-slate-200">
                   <div className="flex justify-between items-center mb-2">
-                    <label className="block text-sm font-medium text-slate-700">Komposisi Bahan Baku (Resep)</label>
+                    <label className="block text-sm font-medium text-slate-700">{recipeTitle}</label>
                     <button type="button" onClick={() => setNewProductRecipes([...newProductRecipes, { ingredient_id: inventory.length > 0 ? inventory[0].id : '', qty: '' }])} className="text-xs font-medium text-indigo-600 hover:text-indigo-700 flex items-center gap-1">
-                      <Plus className="w-3 h-3" /> Tambah Bahan
+                      <Plus className="w-3 h-3" /> Tambah {ingredientLabel}
                     </button>
                   </div>
                   {newProductRecipes.map((recipe, index) => (
@@ -423,7 +522,7 @@ export default function ProductsPage() {
                     </div>
                   ))}
                   {newProductRecipes.length === 0 && (
-                    <p className="text-xs text-slate-500 italic">Belum ada bahan baku ditambahkan.</p>
+                    <p className="text-xs text-slate-500 italic">Belum ada {ingredientLabel.toLowerCase()} ditambahkan.</p>
                   )}
                 </div>
                 <button type="submit" className="w-full bg-indigo-600 text-white py-2.5 rounded-lg font-medium hover:bg-indigo-700 transition-colors mt-4">Simpan Produk</button>
@@ -439,12 +538,12 @@ export default function ProductsPage() {
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
             <motion.div initial={{ scale: 0.95 }} animate={{ scale: 1 }} exit={{ scale: 0.95 }} className="bg-white rounded-2xl w-full max-w-md p-6 shadow-2xl">
               <div className="flex justify-between items-center mb-6">
-                <h3 className="text-lg font-bold text-slate-900">Tambah Bahan Resep</h3>
+                <h3 className="text-lg font-bold text-slate-900">Tambah {ingredientLabel}</h3>
                 <button onClick={() => setShowAddRecipeModal(false)} className="text-slate-400 hover:text-slate-600"><X className="w-5 h-5" /></button>
               </div>
               <form onSubmit={handleAddRecipe} className="space-y-4">
                 <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1">Pilih Bahan Baku</label>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">Pilih {ingredientLabel}</label>
                   <select value={recipeIngredientId} onChange={e => setRecipeIngredientId(e.target.value)} className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none text-slate-900">
                     {inventory.map(i => <option key={i.id} value={i.id}>{i.name} ({i.unit})</option>)}
                   </select>
@@ -472,13 +571,34 @@ export default function ProductsPage() {
               <form onSubmit={handleEditProductSubmit} className="space-y-4 max-h-[75vh] overflow-y-auto px-1">
                 <div>
                   <label className="block text-sm font-medium text-slate-700 mb-1">Nama Produk</label>
-                  <input type="text" value={editProductName} onChange={e => setEditProductName(e.target.value)} required className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none text-slate-900" placeholder="Contoh: Kopi Susu Aren" />
+                  <input type="text" value={editProductName} onChange={e => setEditProductName(e.target.value)} required className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none text-slate-900" placeholder={`Contoh: ${productExample}`} />
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-slate-700 mb-1">Kategori</label>
-                  <select value={editProductCategory} onChange={e => setEditProductCategory(e.target.value)} className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none text-slate-900">
-                    {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-                  </select>
+                  {isAddingCategory ? (
+                    <div className="flex gap-2">
+                      <input 
+                        type="text" 
+                        value={newCategoryName} 
+                        onChange={e => setNewCategoryName(e.target.value)} 
+                        className="flex-1 border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none text-slate-900" 
+                        placeholder="Nama kategori..." 
+                        autoFocus
+                      />
+                      <button type="button" onClick={handleSaveCategory} className="bg-indigo-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-indigo-700">Simpan</button>
+                      <button type="button" onClick={() => setIsAddingCategory(false)} className="bg-slate-100 text-slate-600 px-3 py-2 rounded-lg text-sm hover:bg-slate-200">Batal</button>
+                    </div>
+                  ) : (
+                    <div className="flex gap-2">
+                      <select value={editProductCategory} onChange={e => setEditProductCategory(e.target.value)} className="flex-1 border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none text-slate-900">
+                        {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                        {categories.length === 0 && <option value="" disabled>Belum ada kategori</option>}
+                      </select>
+                      <button type="button" onClick={() => setIsAddingCategory(true)} className="flex items-center gap-1 bg-slate-100 text-indigo-600 px-3 py-2 rounded-lg text-sm font-medium hover:bg-slate-200 whitespace-nowrap">
+                        <Plus className="w-3.5 h-3.5" /> Kategori
+                      </button>
+                    </div>
+                  )}
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-slate-700 mb-1">Harga Jual (Rp)</label>
@@ -511,9 +631,9 @@ export default function ProductsPage() {
                 {/* Komposisi Bahan Baku */}
                 <div className="pt-2 border-t border-slate-200">
                   <div className="flex justify-between items-center mb-2">
-                    <label className="block text-sm font-medium text-slate-700">Komposisi Bahan Baku (Resep)</label>
+                    <label className="block text-sm font-medium text-slate-700">{recipeTitle}</label>
                     <button type="button" onClick={() => setEditProductRecipes([...editProductRecipes, { ingredient_id: inventory.length > 0 ? inventory[0].id : '', qty: '' }])} className="text-xs font-medium text-indigo-600 hover:text-indigo-700 flex items-center gap-1">
-                      <Plus className="w-3 h-3" /> Tambah Bahan
+                      <Plus className="w-3 h-3" /> Tambah {ingredientLabel}
                     </button>
                   </div>
                   {editProductRecipes.map((recipe, index) => (
@@ -552,7 +672,7 @@ export default function ProductsPage() {
                     </div>
                   ))}
                   {editProductRecipes.length === 0 && (
-                    <p className="text-xs text-slate-500 italic">Belum ada bahan baku ditambahkan.</p>
+                    <p className="text-xs text-slate-500 italic">Belum ada {ingredientLabel.toLowerCase()} ditambahkan.</p>
                   )}
                 </div>
                 <button type="submit" className="w-full bg-indigo-600 text-white py-2.5 rounded-lg font-medium hover:bg-indigo-700 transition-colors mt-4">Simpan Perubahan</button>

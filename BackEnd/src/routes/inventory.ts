@@ -6,7 +6,11 @@ const router = Router();
 // ==================== GET ALL ====================
 router.get('/', async (req: Request, res: Response) => {
   try {
+    const { business_id } = req.query;
+    const whereClause = business_id ? { business_id: String(business_id) } : {};
+
     const ingredients = await prisma.ingredient.findMany({
+      where: whereClause,
       include: {
         inventory_movements: {
           orderBy: { created_at: 'desc' },

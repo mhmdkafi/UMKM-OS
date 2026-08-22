@@ -15,6 +15,7 @@ export default function EmployeesPage() {
   const [newName, setNewName] = useState("");
   const [newRole, setNewRole] = useState("Kasir");
   const [newAccessValue, setNewAccessValue] = useState("");
+  const [newPassword, setNewPassword] = useState("");
 
   // Form State Edit
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
@@ -22,6 +23,7 @@ export default function EmployeesPage() {
   const [editName, setEditName] = useState("");
   const [editRole, setEditRole] = useState("Kasir");
   const [editAccessValue, setEditAccessValue] = useState("");
+  const [editPassword, setEditPassword] = useState("");
 
   const getBusinessId = () => {
     if (typeof window !== 'undefined') {
@@ -49,13 +51,17 @@ export default function EmployeesPage() {
 
   const handleAddEmployee = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newName || !newAccessValue) return;
+    if (!newName || !newAccessValue || (newRole === 'Manager' && !newPassword)) return;
 
     try {
       const bid = getBusinessId();
       const body: any = { business_id: bid, name: newName, role: newRole };
-      if (newRole === 'Kasir') body.pin = newAccessValue;
-      else body.email = newAccessValue;
+      if (newRole === 'Kasir') {
+        body.pin = newAccessValue;
+      } else {
+        body.email = newAccessValue;
+        body.pin = newPassword;
+      }
 
       const res = await fetch(`${API}/employees`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -65,7 +71,7 @@ export default function EmployeesPage() {
       if (data.success) {
         fetchEmployees();
         setIsModalOpen(false);
-        setNewName(""); setNewRole("Kasir"); setNewAccessValue("");
+        setNewName(""); setNewRole("Kasir"); setNewAccessValue(""); setNewPassword("");
       }
     } catch (err) { console.error(err); }
   };
@@ -75,6 +81,7 @@ export default function EmployeesPage() {
     setEditName(emp.name);
     setEditRole(emp.role);
     setEditAccessValue(""); // Biarkan kosong jika tidak mengubah PIN/Email
+    setEditPassword("");
     setIsEditModalOpen(true);
   };
 
@@ -84,9 +91,11 @@ export default function EmployeesPage() {
 
     try {
       const body: any = { name: editName, role: editRole };
-      if (editAccessValue) {
-        if (editRole === 'Kasir') body.pin = editAccessValue;
-        else body.email = editAccessValue;
+      if (editRole === 'Kasir') {
+        if (editAccessValue) body.pin = editAccessValue;
+      } else {
+        if (editAccessValue) body.email = editAccessValue;
+        if (editPassword) body.pin = editPassword;
       }
 
       const res = await fetch(`${API}/employees/${editingEmployee.id}`, {
@@ -275,6 +284,19 @@ export default function EmployeesPage() {
                   )}
                 </div>
 
+                {newRole === "Manager" && (
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-1.5">Password Login</label>
+                    <input 
+                      required 
+                      type="password"
+                      value={newPassword} onChange={e => setNewPassword(e.target.value)}
+                      placeholder="Masukkan password..."
+                      className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:bg-white outline-none transition-all tracking-widest"
+                    />
+                  </div>
+                )}
+
                 <div className="pt-4 flex gap-3">
                   <button 
                     type="button" onClick={() => setIsModalOpen(false)}
@@ -348,6 +370,18 @@ export default function EmployeesPage() {
                     className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:bg-white outline-none transition-all tracking-widest"
                   />
                 </div>
+
+                {editRole === "Manager" && (
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-1.5">Password Baru (Opsional)</label>
+                    <input 
+                      type="password"
+                      value={editPassword} onChange={e => setEditPassword(e.target.value)}
+                      placeholder="Kosongkan jika tidak ingin mengubah"
+                      className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:bg-white outline-none transition-all tracking-widest"
+                    />
+                  </div>
+                )}
 
                 <div className="pt-4 flex gap-3">
                   <button 
