@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Search, Plus, Minus, Trash2, CreditCard, Banknote, ShoppingCart, X, CheckCircle2 } from "lucide-react";
+import { Search, Plus, Minus, Trash2, CreditCard, Banknote, ShoppingCart, X, CheckCircle2, User, QrCode, Receipt } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 
 const dummyProducts = [
@@ -20,7 +20,13 @@ export default function PosInterface() {
   const [search, setSearch] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("Semua");
   const [isMobileCartOpen, setIsMobileCartOpen] = useState(false);
-  const [showSuccess, setShowSuccess] = useState(false);
+  
+  // Payment State
+  const [paymentModalType, setPaymentModalType] = useState<"tunai" | "qris" | null>(null);
+  const [customerName, setCustomerName] = useState("");
+  const [receivedAmount, setReceivedAmount] = useState("");
+  const [showReceipt, setShowReceipt] = useState(false);
+  const [queueNumber, setQueueNumber] = useState("");
 
   const categories = ["Semua", ...Array.from(new Set(dummyProducts.map(p => p.category)))];
 
@@ -53,21 +59,36 @@ export default function PosInterface() {
     setCart(cart.filter(item => item.id !== id));
   };
 
-  const handleCheckout = () => {
-    setShowSuccess(true);
-    setTimeout(() => {
-      setShowSuccess(false);
-      setCart([]);
-      setIsMobileCartOpen(false);
-    }, 2500);
-  };
-
   const subtotal = cart.reduce((sum, item) => sum + (item.price * item.qty), 0);
   const tax = subtotal * 0.11; // PPN 11%
   const total = subtotal + tax;
 
+  const handleProcessPayment = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!customerName) return;
+    
+    // Generate Random Queue Number
+    const randomQueue = Math.floor(Math.random() * 99) + 1;
+    setQueueNumber(`A-${randomQueue.toString().padStart(3, '0')}`);
+    
+    setPaymentModalType(null);
+    setShowReceipt(true);
+  };
+
+  const handleFinishTransaction = () => {
+    setShowReceipt(false);
+    setCart([]);
+    setCustomerName("");
+    setReceivedAmount("");
+    setQueueNumber("");
+    setIsMobileCartOpen(false);
+  };
+
+  const parsedReceived = parseInt(receivedAmount.replace(/\D/g, '')) || 0;
+  const change = parsedReceived - total;
+
   return (
-    <div className="h-[calc(100vh-4rem)] flex flex-col md:flex-row gap-0 -m-4 sm:-m-6 lg:-m-8 bg-slate-50/50">
+    <div className="h-[calc(100vh-4rem)] flex flex-col md:flex-row gap-0 -m-4 sm:-m-6 lg:-m-8 bg-slate-50/50 relative">
       
       {/* Product List Section (Left) */}
       <div className="flex-1 flex flex-col min-h-0 overflow-hidden relative z-0">
@@ -120,7 +141,6 @@ export default function PosInterface() {
                     className="group relative bg-white rounded-3xl border border-slate-200 overflow-hidden shadow-sm hover:shadow-xl hover:border-indigo-200 transition-all duration-300 flex flex-col cursor-pointer"
                     onClick={() => addToCart(product)}
                   >
-                    {/* Badge Qty */}
                     {qtyInCart > 0 && (
                       <div className="absolute top-3 right-3 z-10 bg-indigo-600 text-white w-8 h-8 flex items-center justify-center rounded-full font-bold shadow-lg shadow-indigo-600/30">
                         {qtyInCart}
@@ -128,7 +148,6 @@ export default function PosInterface() {
                     )}
                     
                     <div className="h-40 sm:h-48 w-full relative overflow-hidden bg-slate-100">
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
                       <img 
                         src={product.image} 
                         alt={product.name}
@@ -147,9 +166,7 @@ export default function PosInterface() {
                         <p className="text-indigo-600 font-bold text-lg">Rp {(product.price / 1000)}k</p>
                         <p className="text-xs text-slate-400 font-medium mt-0.5">Stok: {product.stock}</p>
                       </div>
-                      <button 
-                        className="w-10 h-10 rounded-full bg-slate-100 text-slate-700 flex items-center justify-center group-hover:bg-indigo-600 group-hover:text-white transition-colors"
-                      >
+                      <button className="w-10 h-10 rounded-full bg-slate-100 text-slate-700 flex items-center justify-center group-hover:bg-indigo-600 group-hover:text-white transition-colors">
                         <Plus className="w-5 h-5" />
                       </button>
                     </div>
@@ -161,7 +178,7 @@ export default function PosInterface() {
         </div>
 
         {/* Mobile Cart Floating Bar */}
-        {!isMobileCartOpen && (
+        {!isMobileCartOpen && !showReceipt && (
           <div className="md:hidden fixed bottom-4 left-4 right-4 z-40">
             <button 
               onClick={() => setIsMobileCartOpen(true)}
@@ -188,7 +205,7 @@ export default function PosInterface() {
 
       {/* Cart Section (Right) / Mobile Drawer */}
       <div className={`
-        fixed inset-y-0 right-0 z-50 w-full md:w-[400px] lg:w-[460px] 
+        fixed inset-y-0 right-0 z-40 w-full md:w-[400px] lg:w-[460px] 
         bg-white flex flex-col shadow-[0_0_40px_rgba(0,0,0,0.1)] md:relative 
         transform transition-transform duration-300 ease-in-out border-l border-slate-200
         ${isMobileCartOpen ? "translate-x-0" : "translate-x-full md:translate-x-0"}
@@ -201,7 +218,7 @@ export default function PosInterface() {
             </div>
             <div>
               <h2 className="text-lg font-bold text-slate-900">Pesanan Saat Ini</h2>
-              <p className="text-xs text-slate-500 font-medium">Transaksi #INV-{Date.now().toString().slice(-6)}</p>
+              <p className="text-xs text-slate-500 font-medium">Draft Transaksi</p>
             </div>
           </div>
           <button 
@@ -234,7 +251,6 @@ export default function PosInterface() {
                     key={item.id} 
                     className="bg-white p-3 sm:p-4 rounded-2xl border border-slate-100 shadow-sm flex gap-4 items-center group hover:border-indigo-100 transition-colors"
                   >
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img src={item.image} alt={item.name} className="w-16 h-16 rounded-xl object-cover shadow-sm flex-shrink-0" />
                     
                     <div className="flex-1 min-w-0 py-1">
@@ -275,41 +291,207 @@ export default function PosInterface() {
               <span className="text-slate-800">Rp {tax.toLocaleString('id-ID')}</span>
             </div>
             <div className="flex justify-between font-black text-xl text-slate-900 pt-4 border-t border-slate-100 border-dashed">
-              <span>Total</span>
+              <span>Total Tagihan</span>
               <span className="text-indigo-600">Rp {total.toLocaleString('id-ID')}</span>
             </div>
           </div>
           
-          {showSuccess ? (
-            <motion.div 
-              initial={{ opacity: 0, scale: 0.9 }}
-              animate={{ opacity: 1, scale: 1 }}
-              className="w-full bg-emerald-50 border border-emerald-200 text-emerald-700 py-4 rounded-2xl font-bold flex justify-center items-center gap-2 shadow-inner"
+          <div className="grid grid-cols-2 gap-3">
+            <button 
+              onClick={() => setPaymentModalType("tunai")}
+              disabled={cart.length === 0}
+              className="group flex flex-col items-center justify-center gap-1 bg-slate-900 text-white p-4 rounded-2xl font-bold hover:bg-slate-800 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-xl shadow-slate-900/20"
             >
-              <CheckCircle2 className="w-6 h-6" /> Pembayaran Berhasil!
-            </motion.div>
-          ) : (
-            <div className="grid grid-cols-2 gap-3">
-              <button 
-                onClick={handleCheckout}
-                disabled={cart.length === 0}
-                className="group flex flex-col items-center justify-center gap-1 bg-slate-900 text-white p-4 rounded-2xl font-bold hover:bg-slate-800 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-xl shadow-slate-900/20"
-              >
-                <Banknote className="w-6 h-6 mb-1 text-emerald-400 group-hover:scale-110 transition-transform" />
-                Tunai
-              </button>
-              <button 
-                onClick={handleCheckout}
-                disabled={cart.length === 0}
-                className="group flex flex-col items-center justify-center gap-1 bg-indigo-600 text-white p-4 rounded-2xl font-bold hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-xl shadow-indigo-600/30"
-              >
-                <CreditCard className="w-6 h-6 mb-1 text-indigo-200 group-hover:scale-110 transition-transform" />
-                QRIS
-              </button>
-            </div>
-          )}
+              <Banknote className="w-6 h-6 mb-1 text-emerald-400 group-hover:scale-110 transition-transform" />
+              Tunai
+            </button>
+            <button 
+              onClick={() => setPaymentModalType("qris")}
+              disabled={cart.length === 0}
+              className="group flex flex-col items-center justify-center gap-1 bg-indigo-600 text-white p-4 rounded-2xl font-bold hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-xl shadow-indigo-600/30"
+            >
+              <CreditCard className="w-6 h-6 mb-1 text-indigo-200 group-hover:scale-110 transition-transform" />
+              QRIS
+            </button>
+          </div>
         </div>
       </div>
+
+      {/* PAYMENT MODAL */}
+      <AnimatePresence>
+        {paymentModalType && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6">
+            <motion.div 
+              initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+              className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm"
+              onClick={() => setPaymentModalType(null)}
+            />
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.95, y: 20 }} 
+              animate={{ opacity: 1, scale: 1, y: 0 }} 
+              exit={{ opacity: 0, scale: 0.95, y: 20 }}
+              className="relative bg-white rounded-3xl shadow-2xl w-full max-w-lg overflow-hidden flex flex-col max-h-full"
+            >
+              <div className="px-6 py-5 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
+                <h3 className="text-xl font-bold text-slate-900 flex items-center gap-2">
+                  {paymentModalType === "tunai" ? <Banknote className="w-6 h-6 text-emerald-600" /> : <QrCode className="w-6 h-6 text-indigo-600" />}
+                  Pembayaran {paymentModalType === "tunai" ? "Tunai (Cash)" : "QRIS"}
+                </h3>
+                <button onClick={() => setPaymentModalType(null)} className="p-2 bg-white hover:bg-slate-100 text-slate-500 rounded-full shadow-sm">
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+              
+              <form onSubmit={handleProcessPayment} className="p-6 overflow-y-auto space-y-6">
+                
+                {/* Total Tagihan Banner */}
+                <div className="bg-indigo-600 text-white rounded-2xl p-6 text-center shadow-inner relative overflow-hidden">
+                  <div className="absolute top-0 left-0 w-full h-full bg-indigo-700/50 transform -skew-y-6 origin-bottom-left -z-0"></div>
+                  <div className="relative z-10">
+                    <p className="text-indigo-200 font-medium mb-1">Total yang harus dibayar</p>
+                    <p className="text-4xl font-black tracking-tight">Rp {total.toLocaleString('id-ID')}</p>
+                  </div>
+                </div>
+
+                {/* Nama Customer */}
+                <div>
+                  <label className="block text-sm font-bold text-slate-700 mb-2">Nama Pelanggan (Pemesan)</label>
+                  <div className="relative">
+                    <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                      <User className="h-5 w-5 text-slate-400" />
+                    </div>
+                    <input 
+                      required autoFocus type="text" value={customerName} onChange={e => setCustomerName(e.target.value)}
+                      placeholder="Contoh: Mas Budi"
+                      className="w-full pl-11 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:bg-white outline-none transition-all text-lg font-medium"
+                    />
+                  </div>
+                </div>
+
+                {/* Specific Payment Fields */}
+                {paymentModalType === "tunai" ? (
+                  <div className="space-y-4 pt-2 border-t border-slate-100">
+                    <div>
+                      <label className="block text-sm font-bold text-slate-700 mb-2">Uang Tunai Diterima</label>
+                      <div className="relative">
+                        <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                          <span className="text-slate-500 font-bold">Rp</span>
+                        </div>
+                        <input 
+                          required type="number" min={total} value={receivedAmount} onChange={e => setReceivedAmount(e.target.value)}
+                          placeholder={total.toString()}
+                          className="w-full pl-12 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:bg-white outline-none transition-all font-bold text-xl text-emerald-700"
+                        />
+                      </div>
+                    </div>
+                    
+                    {parsedReceived >= total && (
+                      <div className="flex justify-between items-center bg-emerald-50 text-emerald-800 p-4 rounded-xl border border-emerald-100">
+                        <span className="font-bold">Kembalian:</span>
+                        <span className="font-black text-xl">Rp {change.toLocaleString('id-ID')}</span>
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <div className="pt-2 border-t border-slate-100 flex flex-col items-center">
+                    <p className="text-sm font-medium text-slate-500 mb-4 text-center">Silakan minta pelanggan untuk scan QR Code di bawah ini menggunakan aplikasi M-Banking atau E-Wallet.</p>
+                    <div className="w-48 h-48 bg-white border-2 border-slate-200 rounded-2xl flex items-center justify-center p-4 shadow-sm">
+                      <QrCode className="w-full h-full text-slate-800" strokeWidth={1} />
+                    </div>
+                  </div>
+                )}
+
+                <button 
+                  type="submit"
+                  disabled={!customerName || (paymentModalType === "tunai" && parsedReceived < total)}
+                  className="w-full py-4 px-4 bg-indigo-600 text-white font-bold rounded-xl hover:bg-indigo-700 shadow-xl shadow-indigo-600/20 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 text-lg"
+                >
+                  <CheckCircle2 className="w-6 h-6" />
+                  {paymentModalType === "tunai" ? "Selesaikan Pembayaran" : "Verifikasi & Selesai"}
+                </button>
+              </form>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* FINAL RECEIPT / SUCCESS OVERLAY */}
+      <AnimatePresence>
+        {showReceipt && (
+          <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-md">
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.9, y: 50 }} 
+              animate={{ opacity: 1, scale: 1, y: 0 }} 
+              exit={{ opacity: 0, scale: 0.9, y: 50 }}
+              className="bg-white w-full max-w-sm rounded-3xl overflow-hidden shadow-2xl"
+            >
+              {/* Receipt Header */}
+              <div className="bg-emerald-500 p-8 flex flex-col items-center justify-center text-white text-center relative overflow-hidden">
+                <div className="absolute -top-10 -right-10 w-32 h-32 bg-emerald-400 rounded-full mix-blend-multiply opacity-50 blur-xl"></div>
+                <div className="absolute -bottom-10 -left-10 w-32 h-32 bg-emerald-600 rounded-full mix-blend-multiply opacity-50 blur-xl"></div>
+                <div className="relative z-10 flex flex-col items-center">
+                  <div className="w-16 h-16 bg-white/20 backdrop-blur-md rounded-full flex items-center justify-center mb-4 border border-white/30 shadow-lg">
+                    <CheckCircle2 className="w-10 h-10 text-white" />
+                  </div>
+                  <h2 className="text-2xl font-black tracking-tight mb-1">Transaksi Sukses!</h2>
+                  <p className="text-emerald-100 font-medium">Pembayaran diterima</p>
+                </div>
+              </div>
+
+              {/* Receipt Details */}
+              <div className="p-8 bg-[#fdfdfd] relative">
+                {/* Jagged border effect for receipt */}
+                <div className="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-transparent via-slate-200 to-transparent opacity-30"></div>
+                
+                <div className="text-center mb-6">
+                  <p className="text-sm text-slate-500 font-medium uppercase tracking-wider mb-1">Nomor Antrean</p>
+                  <p className="text-5xl font-black text-slate-900 tracking-tighter">{queueNumber}</p>
+                </div>
+
+                <div className="space-y-4 border-t border-slate-200 border-dashed pt-6 mb-8">
+                  <div className="flex justify-between items-center text-sm">
+                    <span className="text-slate-500">Nama Pelanggan</span>
+                    <span className="font-bold text-slate-900">{customerName}</span>
+                  </div>
+                  <div className="flex justify-between items-center text-sm">
+                    <span className="text-slate-500">Total Item</span>
+                    <span className="font-bold text-slate-900">{cart.reduce((s, i) => s + i.qty, 0)} Item</span>
+                  </div>
+                  <div className="flex justify-between items-center text-sm">
+                    <span className="text-slate-500">Metode Pembayaran</span>
+                    <span className="font-bold text-slate-900 uppercase">{paymentModalType}</span>
+                  </div>
+                  
+                  {paymentModalType === "tunai" && (
+                    <>
+                      <div className="flex justify-between items-center text-sm">
+                        <span className="text-slate-500">Total Tagihan</span>
+                        <span className="font-bold text-slate-900">Rp {total.toLocaleString('id-ID')}</span>
+                      </div>
+                      <div className="flex justify-between items-center text-sm text-emerald-600 font-medium">
+                        <span>Tunai Diterima</span>
+                        <span>Rp {parsedReceived.toLocaleString('id-ID')}</span>
+                      </div>
+                      <div className="flex justify-between items-center text-sm bg-slate-50 p-3 rounded-lg border border-slate-100 mt-2">
+                        <span className="font-bold text-slate-700">Kembalian</span>
+                        <span className="font-black text-slate-900">Rp {change.toLocaleString('id-ID')}</span>
+                      </div>
+                    </>
+                  )}
+                </div>
+
+                <button 
+                  onClick={handleFinishTransaction}
+                  className="w-full py-4 px-4 bg-slate-900 text-white font-bold rounded-xl hover:bg-slate-800 transition-colors flex items-center justify-center gap-2"
+                >
+                  <Receipt className="w-5 h-5" />
+                  Selesai & Tutup
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
