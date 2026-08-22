@@ -23,8 +23,18 @@ export default function InventoryPage() {
   const [newMinStock, setNewMinStock] = useState("");
   const [businessCategory, setBusinessCategory] = useState("Lainnya");
 
+  const getBusinessId = () => {
+    if (typeof window !== 'undefined') {
+      const user = JSON.parse(localStorage.getItem('user') || '{}');
+      return user.business_id;
+    }
+    return '';
+  };
+
   const fetchInventory = () => {
-    fetch(`${API}/inventory`)
+    const bid = getBusinessId();
+    if (!bid) return;
+    fetch(`${API}/inventory?business_id=${bid}`)
       .then(res => res.json())
       .then(data => setInventory(data))
       .catch(console.error);
@@ -117,7 +127,7 @@ export default function InventoryPage() {
     e.preventDefault();
     if (!newName || !newStock) return;
     try {
-      const biz = inventory[0]?.business_id;
+      const biz = getBusinessId();
       await fetch(`${API}/inventory`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
