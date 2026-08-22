@@ -26,7 +26,7 @@ router.get('/', async (req: Request, res: Response) => {
       stock: ing.stock,
       unit: ing.unit,
       minStock: ing.min_stock_alert,
-      cost_per_unit: (ing as any).cost_per_unit || 0,
+      purchasePrice: ing.purchase_price,
       lastUpdate: ing.inventory_movements[0]?.created_at?.toISOString().split('T')[0] || '-',
       status: ing.stock <= ing.min_stock_alert ? 'Kritis' : (ing.stock <= ing.min_stock_alert * 2 ? 'Menipis' : 'Aman'),
     }));
@@ -39,7 +39,7 @@ router.get('/', async (req: Request, res: Response) => {
 
 // ==================== CREATE (Add new ingredient) ====================
 router.post('/', async (req: Request, res: Response) => {
-  const { business_id, name, unit, stock, min_stock_alert, cost_per_unit } = req.body;
+  const { business_id, name, unit, stock, min_stock_alert, purchase_price } = req.body;
   try {
     const ingredient = await prisma.ingredient.create({
       data: {
@@ -48,8 +48,8 @@ router.post('/', async (req: Request, res: Response) => {
         unit,
         stock: parseFloat(stock) || 0,
         min_stock_alert: parseFloat(min_stock_alert) || 0,
-        cost_per_unit: parseFloat(cost_per_unit) || 0,
-      } as any
+        purchase_price: parseFloat(purchase_price) || 0,
+      }
     });
 
     // Log initial stock
@@ -73,11 +73,16 @@ router.post('/', async (req: Request, res: Response) => {
 
 // ==================== UPDATE ====================
 router.put('/:id', async (req: Request, res: Response) => {
-  const { name, unit, min_stock_alert } = req.body;
+  const { name, unit, min_stock_alert, purchase_price } = req.body;
   try {
     const ingredient = await prisma.ingredient.update({
       where: { id: req.params.id },
-      data: { name, unit, min_stock_alert: parseFloat(min_stock_alert) || 0 },
+      data: {
+        name,
+        unit,
+        min_stock_alert: parseFloat(min_stock_alert) || 0,
+        purchase_price: parseFloat(purchase_price) || 0,
+      },
     });
     res.json({ success: true, ingredient });
   } catch (err) {
@@ -101,29 +106,26 @@ router.delete('/:id', async (req: Request, res: Response) => {
 
 // ==================== STOCK ADJUSTMENT ====================
 router.post('/adjust', async (req: Request, res: Response) => {
-  const { id, type, amount, notes, cost_per_unit } = req.body;
+  const { id, type, amount, notes, purchase_price } = req.body;
   try {
     const current = await prisma.ingredient.findUnique({ where: { id } });
     if (!current) return res.status(404).json({ error: 'Ingredient not found' });
     
     let newStock = current.stock;
-    let newCostPerUnit = (current as any).cost_per_unit || 0;
-
     if (type === 'in') {
-      const addQty = parseFloat(amount);
-      const addCost = parseFloat(cost_per_unit) || newCostPerUnit;
-      // Weighted Average Cost (WAC)
-      if (newStock + addQty > 0) {
-        newCostPerUnit = ((newStock * newCostPerUnit) + (addQty * addCost)) / (newStock + addQty);
-      }
-      newStock += addQty;
+      newStock += parseFloat(amount);
     } else {
       newStock = Math.max(0, newStock - parseFloat(amount));
     }
 
     const ingredient = await prisma.ingredient.update({
       where: { id },
-      data: { stock: newStock, cost_per_unit: newCostPerUnit } as any,
+      data: {
+        stock: newStock,
+        ...(purchase_price !== undefined && purchase_price !== ''
+          ? { purchase_price: parseFloat(purchase_price) || 0 }
+          : {}),
+      },
     });
 
     await prisma.inventoryMovement.create({

@@ -7,26 +7,26 @@ import { motion, AnimatePresence } from "framer-motion";
 export default function PosInterface() {
   const [products, setProducts] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [currentUser, setCurrentUser] = useState<any>(null);
+  const [user, setUser] = useState<any>(null);
 
   useEffect(() => {
-    const userStr = localStorage.getItem('user');
-    if (userStr) {
-      const user = JSON.parse(userStr);
-      setCurrentUser(user);
-      fetch(`http://localhost:5000/api/products?business_id=${user.business_id}`)
-        .then(res => res.json())
-        .then(data => {
-          setProducts(Array.isArray(data) ? data : []);
-          setIsLoading(false);
-        })
-        .catch(err => {
-          console.error("Failed to load products:", err);
-          setIsLoading(false);
-        });
-    } else {
+    const savedUser = JSON.parse(localStorage.getItem('user') || '{}');
+    if (!savedUser.business_id) {
       setIsLoading(false);
+      return;
     }
+
+    setUser(savedUser);
+    fetch(`http://localhost:5000/api/products?business_id=${encodeURIComponent(savedUser.business_id)}`)
+      .then(res => res.json())
+      .then(data => {
+        setProducts(data);
+        setIsLoading(false);
+      })
+      .catch(err => {
+        console.error("Failed to load products:", err);
+        setIsLoading(false);
+      });
   }, []);
   const [cart, setCart] = useState<any[]>([]);
   const [search, setSearch] = useState("");
@@ -79,17 +79,14 @@ export default function PosInterface() {
     e.preventDefault();
     if (!customerName) return;
     
-    const businessId = currentUser?.business_id;
-    const cashierId = currentUser?.id || 'system';
-
     // POST to backend API
     try {
       const response = await fetch('http://localhost:5000/api/pos/checkout', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          business_id: businessId,
-          cashier_id: cashierId,
+          business_id: user?.business_id,
+          cashier_id: user?.id,
           customer_name: customerName,
           total_amount: total,
           payment_method: paymentModalType?.toUpperCase(),
@@ -99,6 +96,7 @@ export default function PosInterface() {
       
       const data = await response.json();
       if (data.success) {
+        // Use generated transaction ID for queue number if possible, or random
         setQueueNumber(`A-${data.transaction.id.slice(0,4).toUpperCase()}`);
         setPaymentModalType(null);
         setShowReceipt(true);
@@ -130,14 +128,14 @@ export default function PosInterface() {
   const change = parsedReceived - total;
 
   return (
-    <div className="h-[calc(100vh-4rem)] flex flex-col md:flex-row gap-0 -m-4 sm:-m-6 lg:-m-8 bg-slate-50/50 relative">
+    <div className="h-[calc(100dvh-4rem)] min-h-[540px] flex flex-col lg:flex-row gap-0 -m-4 sm:-m-6 lg:-m-8 bg-slate-50 relative overflow-hidden">
       
       {/* Product List Section (Left) */}
       <div className="flex-1 flex flex-col min-h-0 overflow-hidden relative z-0">
         
         {/* Search & Filter Header */}
-        <div className="p-4 sm:p-6 lg:p-8 pb-4 space-y-4 bg-white/80 backdrop-blur-md border-b border-slate-200/60 sticky top-0 z-10">
-          <div className="relative max-w-2xl mx-auto md:mx-0">
+        <div className="p-4 sm:p-5 lg:p-6 pb-3 space-y-3 bg-white border-b border-slate-200 sticky top-0 z-10">
+          <div className="relative max-w-3xl">
             <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
               <Search className="h-5 w-5 text-indigo-400" />
             </div>
@@ -146,15 +144,15 @@ export default function PosInterface() {
               placeholder="Cari produk (Muffin, Kopi...)" 
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="block w-full pl-12 pr-4 py-3.5 bg-slate-100/80 border-transparent rounded-2xl leading-5 placeholder-slate-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all shadow-sm"
+              className="block w-full pl-12 pr-4 py-3 bg-slate-100 border border-transparent rounded-xl leading-5 placeholder-slate-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all"
             />
           </div>
-          <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide max-w-full">
+          <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide max-w-full">
             {categories.map(cat => (
               <button 
                 key={cat}
                 onClick={() => setSelectedCategory(cat)}
-                className={`px-5 py-2.5 rounded-xl text-sm font-semibold whitespace-nowrap transition-all duration-200 shadow-sm ${
+                className={`px-4 py-2 rounded-lg text-sm font-semibold whitespace-nowrap transition-all duration-200 shadow-sm ${
                   selectedCategory === cat 
                     ? "bg-slate-900 text-white ring-2 ring-slate-900 ring-offset-2" 
                     : "bg-white text-slate-600 border border-slate-200 hover:bg-slate-50 hover:text-slate-900"
@@ -167,11 +165,11 @@ export default function PosInterface() {
         </div>
 
         {/* Product Grid */}
-        <div className="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8 pb-32 md:pb-8">
+        <div className="flex-1 overflow-y-auto overscroll-contain p-4 sm:p-5 lg:p-6 pb-28 lg:pb-6">
           {isLoading ? (
             <div className="flex items-center justify-center h-full text-slate-500 font-medium">Memuat data produk dari Backend API...</div>
           ) : (
-            <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-6">
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:[grid-template-columns:repeat(auto-fill,minmax(180px,1fr))] 2xl:[grid-template-columns:repeat(auto-fill,minmax(210px,1fr))] gap-3 sm:gap-4 lg:gap-5">
             <AnimatePresence>
               {filteredProducts.map(product => {
                 const qtyInCart = cart.find(item => item.id === product.id)?.qty || 0;
@@ -183,35 +181,35 @@ export default function PosInterface() {
                     animate={{ opacity: 1, scale: 1 }}
                     exit={{ opacity: 0, scale: 0.9 }}
                     key={product.id}
-                    className="group relative bg-white rounded-3xl border border-slate-200 overflow-hidden shadow-sm hover:shadow-xl hover:border-indigo-200 transition-all duration-300 flex flex-col cursor-pointer"
+                    className="group relative min-w-0 bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm hover:shadow-lg hover:-translate-y-0.5 hover:border-indigo-300 transition-all duration-200 flex flex-col cursor-pointer"
                     onClick={() => addToCart(product)}
                   >
                     {qtyInCart > 0 && (
-                      <div className="absolute top-3 right-3 z-10 bg-indigo-600 text-white w-8 h-8 flex items-center justify-center rounded-full font-bold shadow-lg shadow-indigo-600/30">
+                      <div className="absolute top-2.5 right-2.5 z-10 bg-indigo-600 text-white w-7 h-7 flex items-center justify-center rounded-full text-sm font-bold shadow-lg shadow-indigo-600/30">
                         {qtyInCart}
                       </div>
                     )}
                     
-                    <div className="h-40 sm:h-48 w-full relative overflow-hidden bg-slate-100">
+                    <div className="aspect-[4/3] sm:aspect-square lg:aspect-[4/3] w-full relative overflow-hidden bg-slate-100">
                       <img 
                         src={product.image} 
                         alt={product.name}
                         className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
                       />
                       <div className="absolute inset-0 bg-gradient-to-t from-slate-900/80 via-slate-900/20 to-transparent opacity-80"></div>
-                      <div className="absolute bottom-4 left-4 right-4">
-                        <span className="inline-block px-2.5 py-1 bg-white/20 backdrop-blur-md text-white text-xs font-semibold rounded-lg mb-2 border border-white/20">
+                      <div className="absolute bottom-3 left-3 right-3">
+                        <span className="inline-block max-w-full truncate px-2 py-1 bg-white/20 backdrop-blur-md text-white text-[11px] font-semibold rounded-md mb-1.5 border border-white/20">
                           {product.category}
                         </span>
-                        <h3 className="font-bold text-white text-lg leading-tight line-clamp-1">{product.name}</h3>
+                        <h3 className="font-bold text-white text-base sm:text-lg leading-tight line-clamp-2">{product.name}</h3>
                       </div>
                     </div>
-                    <div className="p-4 flex justify-between items-center bg-white">
-                      <div>
-                        <p className="text-indigo-600 font-bold text-lg">Rp {(product.price / 1000)}k</p>
+                    <div className="p-3 sm:p-4 flex justify-between items-center gap-2 bg-white">
+                      <div className="min-w-0">
+                        <p className="text-indigo-600 font-bold text-base sm:text-lg truncate">Rp {product.price.toLocaleString('id-ID')}</p>
                         <p className="text-xs text-slate-400 font-medium mt-0.5">Stok: {product.stock}</p>
                       </div>
-                      <button className="w-10 h-10 rounded-full bg-slate-100 text-slate-700 flex items-center justify-center group-hover:bg-indigo-600 group-hover:text-white transition-colors">
+                      <button aria-label={`Tambah ${product.name}`} className="w-9 h-9 sm:w-10 sm:h-10 shrink-0 rounded-full bg-slate-100 text-slate-700 flex items-center justify-center group-hover:bg-indigo-600 group-hover:text-white transition-colors">
                         <Plus className="w-5 h-5" />
                       </button>
                     </div>
@@ -219,13 +217,18 @@ export default function PosInterface() {
                 );
               })}
             </AnimatePresence>
+            {filteredProducts.length === 0 && (
+              <div className="col-span-full py-16 text-center text-slate-500">
+                Produk tidak ditemukan.
+              </div>
+            )}
           </div>
           )}
         </div>
 
         {/* Mobile Cart Floating Bar */}
         {!isMobileCartOpen && !showReceipt && (
-          <div className="md:hidden fixed bottom-4 left-4 right-4 z-40">
+          <div className="lg:hidden fixed bottom-4 left-4 right-4 z-40">
             <button 
               onClick={() => setIsMobileCartOpen(true)}
               className="w-full bg-slate-900 text-white rounded-2xl p-4 shadow-2xl flex items-center justify-between font-bold ring-1 ring-slate-800"
@@ -251,13 +254,13 @@ export default function PosInterface() {
 
       {/* Cart Section (Right) / Mobile Drawer */}
       <div className={`
-        fixed inset-y-0 right-0 z-40 w-full md:w-[400px] lg:w-[460px] 
-        bg-white flex flex-col shadow-[0_0_40px_rgba(0,0,0,0.1)] md:relative 
+        fixed inset-y-0 right-0 z-40 w-full sm:w-[420px] lg:w-[390px] xl:w-[440px] 
+        bg-white flex flex-col shadow-[0_0_40px_rgba(0,0,0,0.14)] lg:relative 
         transform transition-transform duration-300 ease-in-out border-l border-slate-200
-        ${isMobileCartOpen ? "translate-x-0" : "translate-x-full md:translate-x-0"}
+        ${isMobileCartOpen ? "translate-x-0" : "translate-x-full lg:translate-x-0"}
       `}>
         {/* Cart Header */}
-        <div className="px-6 py-5 border-b border-slate-100 flex justify-between items-center bg-white/80 backdrop-blur-md">
+        <div className="px-4 sm:px-6 py-4 sm:py-5 border-b border-slate-100 flex justify-between items-center bg-white">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 bg-indigo-50 rounded-xl flex items-center justify-center text-indigo-600">
               <ShoppingCart className="w-5 h-5" />
@@ -268,7 +271,7 @@ export default function PosInterface() {
             </div>
           </div>
           <button 
-            className="md:hidden p-2 text-slate-400 hover:text-slate-800 hover:bg-slate-100 rounded-full transition-colors"
+            className="lg:hidden p-2 text-slate-400 hover:text-slate-800 hover:bg-slate-100 rounded-full transition-colors"
             onClick={() => setIsMobileCartOpen(false)}
           >
             <X className="w-6 h-6" />
@@ -276,7 +279,7 @@ export default function PosInterface() {
         </div>
 
         {/* Cart Items */}
-        <div className="flex-1 overflow-y-auto p-4 sm:p-6 bg-slate-50/50">
+        <div className="flex-1 overflow-y-auto overscroll-contain p-4 sm:p-5 bg-slate-50/50">
           {cart.length === 0 ? (
             <div className="h-full flex flex-col items-center justify-center text-slate-400 space-y-4">
               <div className="w-24 h-24 bg-slate-100 rounded-full flex items-center justify-center mb-2">
@@ -326,8 +329,8 @@ export default function PosInterface() {
         </div>
 
         {/* Checkout Footer */}
-        <div className="bg-white border-t border-slate-100 p-6 shadow-[0_-10px_40px_rgba(0,0,0,0.03)] z-20">
-          <div className="space-y-3 text-sm mb-6">
+        <div className="bg-white border-t border-slate-100 p-4 sm:p-5 shadow-[0_-10px_40px_rgba(0,0,0,0.03)] z-20">
+          <div className="space-y-3 text-sm mb-4">
             <div className="flex justify-between text-slate-500 font-medium">
               <span>Subtotal</span>
               <span className="text-slate-800">Rp {subtotal.toLocaleString('id-ID')}</span>

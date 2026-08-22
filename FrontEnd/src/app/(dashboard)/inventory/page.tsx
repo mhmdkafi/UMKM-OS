@@ -15,15 +15,15 @@ export default function InventoryPage() {
   const [adjustType, setAdjustType] = useState<'in' | 'out'>('in');
   const [adjustAmount, setAdjustAmount] = useState("");
   const [adjustNotes, setAdjustNotes] = useState("");
+  const [adjustPurchasePrice, setAdjustPurchasePrice] = useState("");
 
   // Add form state
   const [newName, setNewName] = useState("");
   const [newUnit, setNewUnit] = useState("Gram");
   const [newStock, setNewStock] = useState("");
   const [newMinStock, setNewMinStock] = useState("");
-  const [newCostPerUnit, setNewCostPerUnit] = useState("");
+  const [newPurchasePrice, setNewPurchasePrice] = useState("");
   const [businessCategory, setBusinessCategory] = useState("Lainnya");
-  const [adjustCostPerUnit, setAdjustCostPerUnit] = useState("");
 
   const getBusinessId = () => {
     if (typeof window !== 'undefined') {
@@ -116,13 +116,13 @@ export default function InventoryPage() {
           type: adjustType,
           amount: parseFloat(adjustAmount),
           notes: adjustNotes || `${adjustType === 'in' ? 'Stock In' : 'Stock Out'} manual`,
-          cost_per_unit: adjustType === 'in' ? (adjustCostPerUnit || selectedItem.cost_per_unit || 0) : undefined,
+          purchase_price: adjustPurchasePrice,
         }),
       });
       setShowAdjustModal(false);
       setAdjustAmount("");
       setAdjustNotes("");
-      setAdjustCostPerUnit("");
+      setAdjustPurchasePrice("");
       fetchInventory();
     } catch (err) { console.error(err); }
   };
@@ -141,11 +141,11 @@ export default function InventoryPage() {
           unit: newUnit,
           stock: newStock,
           min_stock_alert: newMinStock || "0",
-          cost_per_unit: newCostPerUnit || "0",
+          purchase_price: newPurchasePrice || "0",
         }),
       });
       setShowAddModal(false);
-      setNewName(""); setNewUnit("Gram"); setNewStock(""); setNewMinStock(""); setNewCostPerUnit("");
+      setNewName(""); setNewUnit("Gram"); setNewStock(""); setNewMinStock(""); setNewPurchasePrice("");
       fetchInventory();
     } catch (err) { console.error(err); }
   };
@@ -228,6 +228,7 @@ export default function InventoryPage() {
                 <th className="py-4 px-6 font-medium">Nama {itemLabel}</th>
                 <th className="py-4 px-6 font-medium">Stok Tersedia</th>
                 <th className="py-4 px-6 font-medium">Batas Minimum</th>
+                <th className="py-4 px-6 font-medium">Harga Beli / Unit</th>
                 <th className="py-4 px-6 font-medium">Status</th>
                 <th className="py-4 px-6 font-medium text-right">Aksi</th>
               </tr>
@@ -248,6 +249,7 @@ export default function InventoryPage() {
                     <span className="font-semibold text-slate-900">{item.stock}</span> {item.unit}
                   </td>
                   <td className="py-4 px-6 text-sm text-slate-600">{item.minStock} {item.unit}</td>
+                  <td className="py-4 px-6 text-sm font-medium text-slate-700">Rp {item.purchasePrice.toLocaleString('id-ID')}</td>
                   <td className="py-4 px-6">
                     {item.status === 'Kritis' || item.status === 'Menipis' ? (
                       <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-red-50 text-red-700 border border-red-200">
@@ -263,7 +265,7 @@ export default function InventoryPage() {
                   </td>
                   <td className="py-4 px-6 text-right">
                     <div className="flex justify-end gap-2">
-                      <button onClick={() => { setSelectedItem(item); setAdjustType('in'); setShowAdjustModal(true); }} className="text-indigo-600 hover:text-indigo-900 text-sm font-medium px-2 py-1 rounded hover:bg-indigo-50">
+                      <button onClick={() => { setSelectedItem(item); setAdjustType('in'); setAdjustPurchasePrice(String(item.purchasePrice || '')); setShowAdjustModal(true); }} className="text-indigo-600 hover:text-indigo-900 text-sm font-medium px-2 py-1 rounded hover:bg-indigo-50">
                         Adjust
                       </button>
                       <button onClick={() => handleDelete(item.id)} className="text-red-500 hover:text-red-700 p-1 rounded hover:bg-red-50">
@@ -302,18 +304,14 @@ export default function InventoryPage() {
                   <label className="block text-sm font-medium text-slate-700 mb-1">Jumlah ({selectedItem.unit})</label>
                   <input type="number" value={adjustAmount} onChange={e => setAdjustAmount(e.target.value)} required className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none text-slate-900" placeholder="Contoh: 500" />
                 </div>
-                {adjustType === 'in' && (
-                  <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-1">Harga Beli per Unit (Rp) <span className="text-slate-400 font-normal">— untuk hitung WAC</span></label>
-                    <div className="relative">
-                      <span className="absolute inset-y-0 left-0 pl-3 flex items-center text-slate-500 font-bold text-sm">Rp</span>
-                      <input type="number" value={adjustCostPerUnit} onChange={e => setAdjustCostPerUnit(e.target.value)} className="w-full pl-10 border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none text-slate-900" placeholder={`Saat ini: Rp ${selectedItem.cost_per_unit || 0}`} />
-                    </div>
-                  </div>
-                )}
                 <div>
                   <label className="block text-sm font-medium text-slate-700 mb-1">Catatan</label>
                   <input type="text" value={adjustNotes} onChange={e => setAdjustNotes(e.target.value)} className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none text-slate-900" placeholder="Beli dari supplier, dll" />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">Harga Beli per {selectedItem.unit} (Rp)</label>
+                  <input type="number" min="0" value={adjustPurchasePrice} onChange={e => setAdjustPurchasePrice(e.target.value)} className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none text-slate-900" placeholder="Contoh: 5000" />
+                  <p className="text-xs text-slate-500 mt-1">Ubah bila harga dari supplier berubah.</p>
                 </div>
                 <button type="submit" className="w-full bg-indigo-600 text-white py-2.5 rounded-lg font-medium hover:bg-indigo-700 transition-colors">Simpan Adjustment</button>
               </form>
@@ -355,12 +353,9 @@ export default function InventoryPage() {
                   </div>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1">Harga Beli per Unit (Rp) <span className="text-slate-400 font-normal">— untuk kalkulasi COGS/HPP</span></label>
-                  <div className="relative">
-                    <span className="absolute inset-y-0 left-0 pl-3 flex items-center text-slate-500 font-bold text-sm">Rp</span>
-                    <input type="number" value={newCostPerUnit} onChange={e => setNewCostPerUnit(e.target.value)} className="w-full pl-10 border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none text-slate-900" placeholder="Contoh: 18000" />
-                  </div>
-                  <p className="text-xs text-slate-400 mt-1">WAC akan otomatis diperbarui setiap kali Anda melakukan Stock In dengan harga berbeda.</p>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">Harga Beli per {newUnit} (Rp)</label>
+                  <input type="number" min="0" value={newPurchasePrice} onChange={e => setNewPurchasePrice(e.target.value)} required className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none text-slate-900" placeholder="Contoh: 5000" />
+                  <p className="text-xs text-slate-500 mt-1">Nilai ini digunakan untuk menghitung HPP dan margin produk.</p>
                 </div>
                 <button type="submit" className="w-full bg-indigo-600 text-white py-2.5 rounded-lg font-medium hover:bg-indigo-700 transition-colors">Simpan</button>
               </form>

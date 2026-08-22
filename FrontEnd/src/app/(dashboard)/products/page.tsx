@@ -16,6 +16,7 @@ export default function ProductsPage() {
   const [newCategoryName, setNewCategoryName] = useState("");
   const [inventory, setInventory] = useState<any[]>([]);
   const [showAddProductModal, setShowAddProductModal] = useState(false);
+  const [isSavingProduct, setIsSavingProduct] = useState(false);
   const [newProductName, setNewProductName] = useState("");
   const [newProductCategory, setNewProductCategory] = useState("");
   const [newProductPrice, setNewProductPrice] = useState("");
@@ -110,8 +111,14 @@ export default function ProductsPage() {
       return;
     }
     try {
+      setIsSavingProduct(true);
       const biz = getBusinessId();
-      await fetch(`${API}/products`, {
+      if (!biz) {
+        alert('Sesi bisnis tidak ditemukan. Silakan login kembali.');
+        return;
+      }
+
+      const response = await fetch(`${API}/products`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -126,11 +133,22 @@ export default function ProductsPage() {
           }))
         }),
       });
+
+      const data = await response.json().catch(() => null);
+      if (!response.ok || !data?.success) {
+        throw new Error(data?.error || 'Produk gagal disimpan.');
+      }
+
       setShowAddProductModal(false);
       setNewProductName(""); setNewProductPrice(""); setNewProductImage(""); setNewProductRecipes([]);
       if(categories.length > 0) setNewProductCategory(categories[0].id);
       fetchProducts();
-    } catch (err) { console.error(err); }
+    } catch (err) {
+      console.error(err);
+      alert(err instanceof Error ? err.message : 'Produk gagal disimpan. Silakan coba lagi.');
+    } finally {
+      setIsSavingProduct(false);
+    }
   };
 
   const handleAddRecipe = async (e: React.FormEvent) => {
@@ -169,10 +187,20 @@ export default function ProductsPage() {
   const handleDeleteProduct = async (id: string) => {
     if (!confirm('Hapus produk ini?')) return;
     try {
-      await fetch(`${API}/products/${id}`, { method: 'DELETE' });
+      const response = await fetch(`${API}/products/${id}`, { method: 'DELETE' });
+      const data = await response.json().catch(() => null);
+      if (!response.ok || !data?.success) {
+        throw new Error(data?.error || 'Produk gagal dihapus.');
+      }
       setSelectedProduct(null);
       fetchProducts();
-    } catch (err) { console.error(err); }
+      if (data.archived) {
+        alert('Produk diarsipkan karena sudah memiliki riwayat transaksi. Produk tidak akan muncul lagi di Etalase dan POS.');
+      }
+    } catch (err) {
+      console.error(err);
+      alert(err instanceof Error ? err.message : 'Produk gagal dihapus.');
+    }
   };
 
   const handleEditProductClick = () => {
@@ -525,7 +553,9 @@ export default function ProductsPage() {
                     <p className="text-xs text-slate-500 italic">Belum ada {ingredientLabel.toLowerCase()} ditambahkan.</p>
                   )}
                 </div>
-                <button type="submit" className="w-full bg-indigo-600 text-white py-2.5 rounded-lg font-medium hover:bg-indigo-700 transition-colors mt-4">Simpan Produk</button>
+                <button type="submit" disabled={isSavingProduct} className="w-full bg-indigo-600 text-white py-2.5 rounded-lg font-medium hover:bg-indigo-700 disabled:opacity-60 disabled:cursor-not-allowed transition-colors mt-4">
+                  {isSavingProduct ? 'Menyimpan...' : 'Simpan Produk'}
+                </button>
               </form>
             </motion.div>
           </motion.div>

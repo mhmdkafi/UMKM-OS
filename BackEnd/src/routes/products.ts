@@ -7,7 +7,10 @@ const router = Router();
 router.get('/', async (req: Request, res: Response) => {
   try {
     const { business_id } = req.query;
-    const whereClause = business_id ? { business_id: String(business_id) } : {};
+    const whereClause = {
+      ...(business_id ? { business_id: String(business_id) } : {}),
+      is_active: true,
+    };
 
     const products = await prisma.product.findMany({
       where: whereClause,
@@ -37,8 +40,10 @@ router.get('/', async (req: Request, res: Response) => {
         calculatedStock = (p as any).stock || 0;
       }
 
-      const totalCogs = p.recipes.reduce((sum, r) => sum + (r.quantity_used * ((r.ingredient as any).cost_per_unit || 0)), 0);
-      const margin = p.price > 0 ? Math.round((1 - totalCogs / p.price) * 100) : 0;
+      const cogs = p.recipes.reduce(
+        (sum, r) => sum + (r.quantity_used * r.ingredient.purchase_price),
+        0,
+      );
 
       return {
         id: p.id,
@@ -49,15 +54,14 @@ router.get('/', async (req: Request, res: Response) => {
         category_id: p.category_id,
         image: p.image_url,
         stock: calculatedStock,
-        cogs: totalCogs,
-        margin,
+        cogs,
+        margin: p.price > 0 ? Math.round(((p.price - cogs) / p.price) * 100) : 0,
         recipe: p.recipes.map(r => ({
           id: r.id,
           item: r.ingredient.name,
           qty: String(r.quantity_used),
           unit: r.ingredient.unit,
           ingredient_id: r.ingredient_id,
-          cost_per_unit: (r.ingredient as any).cost_per_unit || 0,
         })),
       };
     });
@@ -156,12 +160,26 @@ router.put('/:id', async (req: Request, res: Response) => {
 // ==================== DELETE ====================
 router.delete('/:id', async (req: Request, res: Response) => {
   try {
+    const transactionCount = await prisma.transactionItem.count({
+      where: { product_id: req.params.id },
+    });
+
+    // Produk yang pernah terjual tidak boleh dihapus permanen karena akan
+    // merusak riwayat transaksi. Arsipkan agar tidak muncul lagi di Etalase/POS.
+    if (transactionCount > 0) {
+      await prisma.product.update({
+        where: { id: req.params.id },
+        data: { is_active: false },
+      });
+      return res.json({ success: true, archived: true });
+    }
+
     await prisma.productRecipe.deleteMany({ where: { product_id: req.params.id } });
     await prisma.product.delete({ where: { id: req.params.id } });
-    res.json({ success: true });
+    res.json({ success: true, archived: false });
   } catch (error) {
     console.error(error);
-    res.status(500).json({ error: 'Failed to delete product' });
+    res.status(500).json({ error: 'Produk gagal dihapus.' });
   }
 });
 

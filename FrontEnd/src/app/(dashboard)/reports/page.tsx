@@ -1,7 +1,8 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Download } from "lucide-react";
+import { Download, FileText, Calendar, Printer } from "lucide-react";
+import { motion } from "framer-motion";
 
 const API = 'http://localhost:5000/api';
 const fmt = (v: number) => `Rp ${v.toLocaleString('id-ID')}`;
@@ -9,16 +10,15 @@ const fmt = (v: number) => `Rp ${v.toLocaleString('id-ID')}`;
 export default function ReportsPage() {
   const [report, setReport] = useState<any>(null);
   const [loading, setLoading] = useState(true);
-  const [currentUser, setCurrentUser] = useState<any>(null);
 
   useEffect(() => {
-    const userStr = localStorage.getItem('user');
-    const user = userStr ? JSON.parse(userStr) : null;
-    setCurrentUser(user);
-    const businessId = user?.business_id || '';
-    const url = businessId ? `${API}/dashboard/reports?business_id=${businessId}` : `${API}/dashboard/reports`;
+    const user = JSON.parse(localStorage.getItem('user') || '{}');
+    if (!user.business_id) {
+      setLoading(false);
+      return;
+    }
 
-    fetch(url)
+    fetch(`${API}/dashboard/reports?business_id=${encodeURIComponent(user.business_id)}`)
       .then(res => res.json())
       .then(data => { setReport(data); setLoading(false); })
       .catch(err => { console.error(err); setLoading(false); });
@@ -37,12 +37,8 @@ export default function ReportsPage() {
   }
 
   const pendapatan = report?.pendapatan || { total: 0, jumlahTransaksi: 0 };
-  const cogs = report?.cogs || { total: 0 };
-  const grossProfit = report?.grossProfit || 0;
   const pengeluaran = report?.pengeluaran || { total: 0, byCategory: {}, items: [] };
   const labaRugi = report?.labaRugi || 0;
-  const businessName = report?.businessName || currentUser?.business_name || 'UMKM OS';
-  const ownerName = currentUser?.name || 'Owner';
 
   return (
     <div className="space-y-6 max-w-5xl mx-auto">
@@ -58,7 +54,7 @@ export default function ReportsPage() {
             className="flex items-center gap-2 bg-indigo-600 text-white px-4 py-2 rounded-lg font-medium hover:bg-indigo-700 transition-colors shadow-sm"
           >
             <Download className="w-4 h-4" />
-            Download / Cetak PDF
+            Download PDF
           </button>
         </div>
       </div>
@@ -69,13 +65,13 @@ export default function ReportsPage() {
         {/* Document Header */}
         <div className="flex justify-between items-start border-b-2 border-slate-900 pb-6 mb-8">
           <div>
-            <h1 className="text-3xl font-bold text-slate-900 uppercase tracking-tight">Laporan Laba Rugi</h1>
-            <p className="text-slate-500 font-medium mt-1">{businessName}</p>
+            <h1 className="text-3xl font-bold text-slate-900 uppercase tracking-tight">Laba Rugi</h1>
+            <p className="text-slate-500 font-medium mt-1">UMKM OS - Kopi Senja</p>
           </div>
           <div className="text-right">
             <p className="text-sm font-semibold text-slate-800">Periode:</p>
             <p className="text-sm text-slate-600">All-Time (Data dari Database)</p>
-            <p className="text-sm text-slate-400 mt-2">Dicetak pada: {new Date().toLocaleDateString('id-ID', { day: '2-digit', month: 'long', year: 'numeric' })}</p>
+            <p className="text-sm text-slate-400 mt-2">Dicetak pada: {new Date().toLocaleDateString('id-ID')}</p>
           </div>
         </div>
 
@@ -84,7 +80,7 @@ export default function ReportsPage() {
           
           {/* Pendapatan */}
           <div>
-            <h3 className="font-bold text-slate-900 text-lg mb-3">I. Pendapatan (Revenue)</h3>
+            <h3 className="font-bold text-slate-900 text-lg mb-3">Pendapatan</h3>
             <table className="w-full text-sm">
               <tbody>
                 <tr className="border-b border-slate-100">
@@ -99,48 +95,26 @@ export default function ReportsPage() {
             </table>
           </div>
 
-          {/* HPP / COGS */}
-          <div>
-            <h3 className="font-bold text-slate-900 text-lg mb-3">II. HPP / COGS (Harga Pokok Penjualan)</h3>
-            <table className="w-full text-sm">
-              <tbody>
-                <tr className="border-b border-slate-100">
-                  <td className="py-2 pl-4 text-slate-700">Total HPP Bahan Baku (berdasarkan resep & WAC)</td>
-                  <td className="py-2 text-right font-medium text-red-600">({fmt(cogs.total)})</td>
-                </tr>
-                <tr className="bg-slate-50 font-bold text-slate-900 border-t-2 border-slate-200">
-                  <td className="py-3 pl-4">TOTAL HPP / COGS</td>
-                  <td className="py-3 text-right text-red-700">({fmt(cogs.total)})</td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-
           {/* Laba Kotor */}
           <div className="bg-indigo-50 border-y-2 border-indigo-200 py-3 px-4 flex justify-between font-bold text-indigo-900 text-lg">
-            <span>LABA KOTOR (GROSS PROFIT)</span>
-            <span>{fmt(grossProfit)}</span>
+            <span>PENDAPATAN KOTOR</span>
+            <span>{fmt(pendapatan.total)}</span>
           </div>
 
           {/* Pengeluaran Operasional */}
           <div>
-            <h3 className="font-bold text-slate-900 text-lg mb-3">III. Pengeluaran Operasional</h3>
+            <h3 className="font-bold text-slate-900 text-lg mb-3">Pengeluaran Operasional</h3>
             <table className="w-full text-sm">
               <tbody>
-                {pengeluaran.items.length > 0 ? pengeluaran.items.map((exp: any, i: number) => (
+                {pengeluaran.items.map((exp: any, i: number) => (
                   <tr key={i} className="border-b border-slate-100">
-                    <td className="py-2 pl-4 text-slate-700">{exp.name} <span className="text-xs text-slate-400">({exp.category})</span></td>
-                    <td className="py-2 text-right font-medium text-slate-900">({fmt(exp.amount)})</td>
+                    <td className="py-2 pl-4 text-slate-700">{exp.name}</td>
+                    <td className="py-2 text-right font-medium text-slate-900">{fmt(exp.amount)}</td>
                   </tr>
-                )) : (
-                  <tr className="border-b border-slate-100">
-                    <td className="py-2 pl-4 text-slate-400 italic">Belum ada pengeluaran operasional yang dicatat</td>
-                    <td className="py-2 text-right text-slate-400">Rp 0</td>
-                  </tr>
-                )}
+                ))}
                 <tr className="bg-slate-50 font-bold text-slate-900 border-t-2 border-slate-200">
-                  <td className="py-3 pl-4">TOTAL PENGELUARAN OPERASIONAL</td>
-                  <td className="py-3 text-right">({fmt(pengeluaran.total)})</td>
+                  <td className="py-3 pl-4">TOTAL PENGELUARAN</td>
+                  <td className="py-3 text-right">{fmt(pengeluaran.total)}</td>
                 </tr>
               </tbody>
             </table>
@@ -153,15 +127,15 @@ export default function ReportsPage() {
           </div>
         </div>
 
-        {/* Footer (Signatures) — dynamic from logged in user */}
+        {/* Footer (Signatures) */}
         <div className="mt-20 pt-8 flex justify-between text-center px-10">
           <div>
             <p className="text-slate-500 mb-16">Disiapkan oleh,</p>
-            <p className="font-bold text-slate-900 border-t border-slate-400 pt-2 inline-block px-4">{ownerName}</p>
+            <p className="font-bold text-slate-900 border-t border-slate-400 pt-2 inline-block px-4">Siti (Manajer Keuangan)</p>
           </div>
           <div>
-            <p className="text-slate-500 mb-16">Tanggal,</p>
-            <p className="font-bold text-slate-900 border-t border-slate-400 pt-2 inline-block px-4">{new Date().toLocaleDateString('id-ID')}</p>
+            <p className="text-slate-500 mb-16">Disetujui oleh,</p>
+            <p className="font-bold text-slate-900 border-t border-slate-400 pt-2 inline-block px-4">Budi (Owner)</p>
           </div>
         </div>
 

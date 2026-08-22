@@ -49,7 +49,9 @@ model Ingredient {
   unit                String
   stock               Float
   min_stock_alert     Float
-  cost_per_unit       Float                @default(0)
+  // Kolom ini sudah ada di database lama; dipetakan kembali agar nilai harga
+  // beli yang tersimpan tidak hilang saat aplikasi diperbarui.
+  purchase_price      Float                @default(0) @map("cost_per_unit")
   product_recipes     ProductRecipe[]
   inventory_movements InventoryMovement[]
 }
@@ -65,6 +67,7 @@ model Product {
   image_url     String?
   stock         Float           @default(0)
   is_service    Boolean         @default(false)
+  is_active     Boolean         @default(true)
   recipes       ProductRecipe[]
   transaction_items TransactionItem[]
 }
