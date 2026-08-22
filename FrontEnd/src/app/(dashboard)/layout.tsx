@@ -62,16 +62,16 @@ export default function DashboardLayout({
     let inventoryName = "Inventaris & Stok";
     let productsName = "Daftar Produk";
 
-    if (businessCategory === "Food & Beverage (Kuliner)") {
+    if (businessCategory === "fnb" || businessCategory === "Food & Beverage (Kuliner)") {
        inventoryName = "Inventaris Bahan Baku";
        productsName = "Menu & Resep";
-    } else if (businessCategory === "Retail / Toko Kelontong") {
+    } else if (businessCategory === "retail" || businessCategory === "Retail / Toko Kelontong") {
        inventoryName = "Stok Gudang / Inventaris";
        productsName = "Etalase Produk";
-    } else if (businessCategory === "Fashion & Pakaian") {
+    } else if (businessCategory === "fashion" || businessCategory === "Fashion & Pakaian") {
        inventoryName = "Stok Barang / Kain";
        productsName = "Katalog Pakaian";
-    } else if (businessCategory === "Jasa / Salon / Bengkel") {
+    } else if (businessCategory === "services" || businessCategory === "Jasa / Salon / Bengkel") {
        inventoryName = "Perlengkapan & Suku Cadang";
        productsName = "Daftar Layanan/Jasa";
     }
